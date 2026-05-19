@@ -1,3 +1,19 @@
+-- Stage 02: clean raw stop events into stops_clean.
+--
+-- Real-world mess handled here:
+--   * Schema drift   - the pipeline registers monthly_raw with union_by_name,
+--                      so columns missing in one month do not break the read.
+--   * Missingness    - blank strings are normalized to NULL via NULLIF(TRIM(...));
+--                      rows with a null id or time are dropped (WHERE clause).
+--   * Outliers       - delay_in_min outside [-60, 720] is set to NULL rather
+--                      than dropped, so the stop still counts for other metrics.
+--   * Encoding       - source Parquet is UTF-8; station names keep their umlauts.
+--   * Time zones     - source timestamps are naive Europe/Berlin wall-clock time.
+--                      No UTC conversion is applied: hour_of_day and weekday are
+--                      meant to read as local clock time for travellers.
+--
+-- Idempotent: CREATE OR REPLACE rebuilds the table from scratch each run.
+
 CREATE OR REPLACE TABLE stops_clean AS
 SELECT
   CAST(id AS VARCHAR) AS stop_id,

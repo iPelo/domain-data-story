@@ -58,16 +58,16 @@ _____________________________________________________
 ## Roadmap
 
 ### Phase 1 — Frame and collect (Week 1)
-- [ ] Finalize the question, write hypotheses **before seeing the data**
-- [ ] Locate dataset, read its documentation, check license
-- [ ] Scrape or download (respect robots.txt, rate limit)
-- [ ] Write `docs/data_dictionary.md`: every column, type, meaning, gotchas
+- [x] Finalize the question, write hypotheses **before seeing the data** — see `README.md`
+- [x] Locate dataset, read its documentation, check license — `piebro/deutsche-bahn-data`, CC BY 4.0
+- [x] Scrape or download (respect robots.txt, rate limit) — `bahn-download`, 12 monthly files for 2025
+- [x] Write `docs/data_dictionary.md`: every column, type, meaning, gotchas
 
 ### Phase 2 — Clean (Week 2)
-- [ ] Pipeline as a sequence of DuckDB SQL files OR Polars functions
-- [ ] **Every step idempotent** — re-running produces identical output
-- [ ] Quality assertions at each stage (row counts, null rates, key uniqueness)
-- [ ] Handle the real mess: time zones, encoding, schema drift, missingness patterns
+- [x] Pipeline as a sequence of DuckDB SQL files OR Polars functions — `sql/02`, `sql/03`
+- [x] **Every step idempotent** — re-running produces identical output (`test_pipeline_is_idempotent`)
+- [x] Quality assertions at each stage (row counts, null rates, key uniqueness) — `quality.py`
+- [x] Handle the real mess: time zones, encoding, schema drift, missingness patterns
 
 ### Phase 3 — Explore (Week 3)
 - [ ] EDA notebook: at least 15 plots, each with a caption stating what it shows

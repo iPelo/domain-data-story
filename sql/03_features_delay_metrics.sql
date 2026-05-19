@@ -1,3 +1,17 @@
+-- Stage 03: aggregate stops_clean into four analysis-ready feature tables.
+--
+-- Each table answers a different slice of the project question:
+--   station_day_metrics    - station-level daily trends and hub comparisons
+--   train_type_day_metrics - national train-family daily trend lines
+--   hourly_delay_metrics   - weekday x hour delay patterns
+--   line_metrics           - per-line/destination outlier ranking
+--
+-- Shares (cancellation_share, late_share_*) are AVG of 0/1 flags, so they are
+-- bounded in [0, 1]. line_metrics keeps only groups with >= 100 stops so rare
+-- lines do not produce noisy rankings.
+--
+-- Idempotent: CREATE OR REPLACE rebuilds every table from scratch each run.
+
 CREATE OR REPLACE TABLE station_day_metrics AS
 SELECT
   service_date,

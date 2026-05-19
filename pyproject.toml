@@ -29,6 +29,7 @@ dev = [
 [project.scripts]
 bahn-download = "bahn_delay_story.ingest:main"
 bahn-pipeline = "bahn_delay_story.pipeline:main"
+bahn-quality = "bahn_delay_story.quality:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -8,6 +8,12 @@ from pathlib import Path
 import duckdb
 
 from bahn_delay_story.config import DEFAULT_DATABASE, PROCESSED_DIR, SQL_DIR, source_parquet_files
+from bahn_delay_story.quality import (
+    check_clean,
+    check_features,
+    check_source,
+    format_report,
+)
 
 SQL_STEPS = [
     SQL_DIR / "02_clean_stops.sql",
@@ -47,45 +53,53 @@ def ensure_source_data() -> None:
         )
 
 
-def run_pipeline(database: Path = DEFAULT_DATABASE, sample_limit: int | None = None) -> None:
-    """Build cleaned and aggregated Parquet outputs."""
+def run_pipeline(
+    database: Path = DEFAULT_DATABASE,
+    sample_limit: int | None = None,
+    output_dir: Path = PROCESSED_DIR,
+) -> dict[str, object]:
+    """Build cleaned and aggregated Parquet outputs.
+
+    Quality assertions run after each stage: against the registered source
+    view, against ``stops_clean``, and against the feature tables. Any failure
+    raises and aborts before outputs are written. Returns the quality report.
+    """
     ensure_source_data()
     if sample_limit is not None:
         sample_limit = int(sample_limit)
         if sample_limit <= 0:
             raise ValueError("sample_limit must be positive.")
 
-    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
     database.parent.mkdir(parents=True, exist_ok=True)
 
     with duckdb.connect(database) as con:
         source_path_sql = duckdb_path_list(source_files())
-        if sample_limit:
-            con.execute(
-                f"""
-                CREATE OR REPLACE VIEW monthly_raw AS
-                SELECT *
-                FROM read_parquet({source_path_sql}, union_by_name = true)
-                LIMIT {sample_limit}
-                """,
-            )
-        else:
-            con.execute(
-                f"""
-                CREATE OR REPLACE VIEW monthly_raw AS
-                SELECT *
-                FROM read_parquet({source_path_sql}, union_by_name = true)
-                """,
-            )
+        limit_clause = f"\nLIMIT {sample_limit}" if sample_limit else ""
+        con.execute(
+            f"""
+            CREATE OR REPLACE VIEW monthly_raw AS
+            SELECT *
+            FROM read_parquet({source_path_sql}, union_by_name = true){limit_clause}
+            """,
+        )
 
-        for step in SQL_STEPS:
-            con.execute(step.read_text())
+        report: dict[str, object] = {"source": check_source(con)}
+
+        con.execute(SQL_STEPS[0].read_text())
+        report["clean"] = check_clean(con)
+
+        con.execute(SQL_STEPS[1].read_text())
+        report["features"] = check_features(con)
 
         for table in OUTPUT_TABLES:
-            output_path = PROCESSED_DIR / f"{table}.parquet"
+            output_path = output_dir / f"{table}.parquet"
             con.execute(
                 f"COPY {table} TO {duckdb_string_literal(str(output_path))} (FORMAT PARQUET)"
             )
+
+    print(format_report(report))
+    return report
 
 
 def main() -> None:

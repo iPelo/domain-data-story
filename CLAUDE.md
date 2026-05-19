@@ -36,6 +36,10 @@ uv run bahn-pipeline
 # Run pipeline (fast smoke test)
 uv run bahn-pipeline --sample-limit 1000000
 
+# Re-validate an existing build (quality assertions only, no rebuild)
+uv run bahn-quality
+.venv/bin/python -m bahn_delay_story.quality
+
 # Download source data from Hugging Face
 uv run bahn-download
 uv run bahn-download --allow-pattern "yearly_processed_data/data-2025-*.parquet"
@@ -58,7 +62,8 @@ uv run pytest
 The pipeline is intentionally thin: SQL does the heavy lifting, Python orchestrates.
 
 1. `src/bahn_delay_story/ingest.py` — downloads source Parquet from Hugging Face into `data/raw/yearly_processed_data/` (also supports `monthly_processed_data/`).
-2. `src/bahn_delay_story/pipeline.py` — opens a DuckDB connection at `data/bahn_delay_story.duckdb`, registers all source Parquet files as a single `monthly_raw` view via `read_parquet(..., union_by_name = true)`, then executes the SQL steps in order and exports each output table to `data/processed/*.parquet`.
+2. `src/bahn_delay_story/pipeline.py` — opens a DuckDB connection at `data/bahn_delay_story.duckdb`, registers all source Parquet files as a single `monthly_raw` view via `read_parquet(..., union_by_name = true)`, then executes the SQL steps in order and exports each output table to `data/processed/*.parquet`. It runs `quality.py` assertions after each stage (source, clean, features); a failed assertion aborts before any output is written, and `run_pipeline` returns the quality report.
+2a. `src/bahn_delay_story/quality.py` — staged data-quality checks (row counts, null rates, `stop_id` uniqueness, delay bounds, share ranges). Used by the pipeline and by `tests/test_pipeline.py`; `bahn-quality` re-runs them read-only against an existing build.
 3. `sql/01_register_sources.sql` — convenience view for interactive DuckDB sessions only; the pipeline registers its own view in Python so it can apply `--sample-limit`.
 4. `sql/02_clean_stops.sql` — produces `stops_clean` with derived columns: `delay_min` (with outliers ≤ -60 or > 720 set to NULL), `is_long_distance` (ICE/IC/EC/ECE/EN/NJ/RJ/RJX/TGV/THA), `is_late_{6,15,60}_min` (false when canceled), and time features.
 5. `sql/03_features_delay_metrics.sql` — aggregates four feature tables: `station_day_metrics`, `train_type_day_metrics`, `hourly_delay_metrics`, `line_metrics` (the last filters `HAVING COUNT(*) >= 100`).
@@ -85,7 +90,9 @@ Key invariants:
 - Date range: 2025-01-01 to 2025-12-31
 - Distinct stations: 5,328
 - Distinct train types: 106
-- Tests: 2 passed
+- Outlier delays set to NULL: 542
+- Null station names: 1,218
+- Tests: 4 passed
 - Ruff: passed
 
 These figures are a sanity baseline — material drift after re-running the pipeline on the same inputs likely indicates a bug.
