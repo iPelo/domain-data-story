@@ -33,8 +33,9 @@
   event but sets `delay_min` outside `[-60, 720]` to null.
 - Source timestamps are naive Europe/Berlin wall-clock time. Hour and weekday
   analysis should be interpreted as local traveler-facing time.
-- The original project question mentions July 2024, but only 2025 files are
-  local right now. Download 2024 files or adjust the final question to 2025.
+- The project scope is now fixed to 2025. Trend claims should use the
+  January-October stable-station panel; November and December are useful for
+  post-expansion mapping, not headline trend comparisons.
 
 ## Next Analysis Step
 

@@ -54,8 +54,9 @@ Build 3-5 focused views:
 
 ## Limitations To Keep In The Writeup
 
-- The current local dataset is 2025 only. The original July 2024 framing needs
-  2024 data, or the final question should be narrowed to 2025.
+- The project scope is 2025 only. The headline trend compares January and
+  October on the stable station panel, avoiding the November/December coverage
+  expansion.
 - Stop-level observations are not passenger-weighted.
 - One delayed train contributes multiple delayed stop observations.
 - No controls for weather, strikes, construction, vehicle availability, or

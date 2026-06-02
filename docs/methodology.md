@@ -4,6 +4,8 @@
 
 This project uses the monthly processed `piebro/deutsche-bahn-data` Parquet files. The files are already structured for stop-level analysis, which keeps the project focused on cleaning, validation, and interpretation rather than API collection.
 
+The analysis scope is fixed to 2025. Headline trend claims use the stable station panel from January through October. November and December are kept for post-expansion views, but not for before/after trend conclusions.
+
 The live DB Timetables API remains useful for:
 
 - validating individual station examples
