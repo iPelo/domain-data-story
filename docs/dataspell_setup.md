@@ -1,5 +1,7 @@
 # DataSpell Setup
 
+These steps keep the notebook kernel, package imports, and command-line tools on the same Python environment.
+
 ## Interpreter
 
 1. Open the project folder in DataSpell.
@@ -30,7 +32,7 @@ python -m pip install -e ".[dev]"
 
 ## Data Download
 
-For a manageable first pass, download one year:
+Download the 2025 source files:
 
 ```bash
 uv run --with huggingface-hub hf download piebro/deutsche-bahn-data \
@@ -45,7 +47,7 @@ Then run:
 uv run bahn-pipeline --sample-limit 1000000
 ```
 
-Remove `--sample-limit` when the notebook logic and charts look right.
+Remove `--sample-limit` for the full build.
 
 ## Useful Run Configurations
 

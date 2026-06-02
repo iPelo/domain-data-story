@@ -2,7 +2,7 @@
 
 ## Analytical Scope
 
-The first project version uses the monthly processed `piebro/deutsche-bahn-data` Parquet files. This avoids building an API crawler before the analysis question is clear.
+This project uses the monthly processed `piebro/deutsche-bahn-data` Parquet files. The files are already structured for stop-level analysis, which keeps the project focused on cleaning, validation, and interpretation rather than API collection.
 
 The live DB Timetables API remains useful for:
 
@@ -10,7 +10,7 @@ The live DB Timetables API remains useful for:
 - adding a small current-day appendix
 - showing how the historical dataset was generated
 
-It should not be the first source for the portfolio analysis because historical API crawling is slower, requires credentials, and creates more rate-limit and reproducibility issues.
+It is not the primary source for this analysis because historical crawling would add credentials, rate limits, and reproducibility problems without improving the current 2025 question.
 
 ## Metrics
 
@@ -23,15 +23,15 @@ Primary metrics:
 - `late_share_15_min`: share of non-canceled stops at least 15 minutes late
 - `cancellation_share`: share of stops marked canceled
 
-The headline metric should probably be `late_share_6_min` for punctuality and `p90_delay_min` for severe tail delay.
+Use `late_share_6_min` for punctuality and `p90_delay_min` for severe tail delay. Keep cancellations separate.
 
-## Recommended First Analysis
+## Analysis Plan
 
 1. Profile coverage by month, station, and train type.
 2. Decide whether the main trend chart should use only the stable station subset.
 3. Compare ICE/IC/EC-like services against regional and S-Bahn services.
 4. Decompose changes by station, train type, weekday, and hour.
-5. Rank station-hour segments by contribution to the change in late stops.
+5. Rank station-hour segments by their contribution to added late stops.
 
 ## Coverage Strategy
 

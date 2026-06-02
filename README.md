@@ -1,43 +1,43 @@
 # BahnDelayStory
 
-> A reproducible data story about Deutsche Bahn delays, cancellations, and the station-hour patterns that explain them.
+BahnDelayStory is a local analysis project for Deutsche Bahn stop-level delay data. It turns monthly Parquet files into cleaned DuckDB-backed feature tables, notebooks, and a Streamlit dashboard for exploring where delays concentrate by train type, station, hour, and route.
 
 **Status:** In development
 **Primary data source:** [`piebro/deutsche-bahn-data`](https://huggingface.co/datasets/piebro/deutsche-bahn-data) monthly processed Parquet files
 **Optional extension:** [DB Timetables API](https://developers.deutschebahn.com/db-api-marketplace/apis/product/timetables) for live spot checks
-**IDE:** JetBrains DataSpell
 **Tech:** Python, DuckDB, Polars, Streamlit, Quarto
 
-## Question
+## Analysis Question
 
-Since July 2024, have Deutsche Bahn delays become more likely or more severe, and which train types, stations, routes, and hours explain the change?
+For the stable 2025 station panel, where did stop-level lateness get worse, and which train types, hubs, routes, and hours explain the change?
 
-This first version should focus on a stable analytical slice:
+The current local dataset contains 2025 files. The source dataset expands from a large-station panel to all stations in November 2025, so trend claims should use the stable station set unless the coverage break is explicitly shown.
 
-- compare train types, especially ICE/IC/EC versus regional and S-Bahn services
-- track late share, average delay, median delay, severe delays, and cancellations
-- isolate station-hour and train-type patterns instead of only reporting national averages
-- account for the coverage break: the source dataset covers the biggest roughly 100 stations from 2024-07 to 2025-11-02, then all stations after that
+## What This Repo Builds
 
-## Hypotheses
+- A reproducible pipeline from raw monthly Parquet files to analysis-ready tables.
+- Data quality checks for row counts, keys, nulls, delay bounds, and metric ranges.
+- Notebooks for exploratory analysis, trend decomposition, and chart production.
+- A Streamlit dashboard for station, train-type, route, and hour-level comparisons.
 
-1. Long-distance trains have a higher late share and more severe tail delays than local services.
-2. Delay increases are concentrated in specific hub stations and evening/weekend time windows.
-3. Cancellation rates and delay minutes tell different stories, so both must be reported.
+## Working Hypotheses
+
+1. Long-distance trains have higher late-share rates and heavier tail delays than local services.
+2. Added late stops concentrate at major hubs and afternoon/evening travel windows.
+3. Cancellation and delay patterns differ enough that they should be reported separately.
 
 ## Project Structure
 
 ```text
 domain-data-story/
 ├── README.md
-├── README-03-data-analysis.md
 ├── pyproject.toml
 ├── data/
 │   ├── raw/
-│   │   ├── yearly_processed_data/      # your current data-YYYY-MM.parquet files
-│   │   └── monthly_processed_data/     # alternate source naming, also supported
+│   │   ├── yearly_processed_data/
+│   │   └── monthly_processed_data/
 │   ├── interim/
-│   └── processed/                      # pipeline outputs
+│   └── processed/
 ├── sql/
 │   ├── 01_register_sources.sql
 │   ├── 02_clean_stops.sql
@@ -67,9 +67,9 @@ domain-data-story/
 
 ## Data
 
-Use the monthly processed Parquet files first. They are already normalized enough for analysis and include station name, EVA station number, train name, destination, delay minutes, cancellation flag, train type, planned times, changed times, and a stop id.
+Use the monthly processed Parquet files. They include station name, EVA station number, train name, destination, delay minutes, cancellation flag, train type, planned times, changed times, and a stop id.
 
-Download a first manageable slice:
+Download the 2025 files:
 
 ```bash
 uv run --with huggingface-hub hf download piebro/deutsche-bahn-data \
@@ -95,13 +95,13 @@ data/raw/yearly_processed_data/data-YYYY-MM.parquet
 
 The code also supports `data/raw/monthly_processed_data/data-YYYY-MM.parquet` if you later use that folder name.
 
-## Setup In DataSpell
+## Setup
 
-1. Open this folder as a DataSpell project.
+1. Open this folder in DataSpell or another Python IDE.
 2. Create a virtual environment with Python 3.11 or newer.
 3. In the terminal, run `uv sync --extra dev`.
 4. Select `.venv/bin/python` as the project interpreter.
-5. Mark `src/` as a Sources Root if DataSpell does not detect the package imports.
+5. Mark `src/` as a Sources Root if the IDE does not detect the package imports.
 6. Open `notebooks/01_eda.ipynb` and select the same interpreter as the notebook kernel.
 
 If `uv` is not installed yet, either install it first or use:
@@ -136,7 +136,7 @@ uv run streamlit run dashboard/app.py
 
 The dashboard reads `data/processed/*.parquet`. If those files do not exist yet, run the pipeline first.
 
-## Analysis Deliverables
+## Analysis Artifacts
 
 - `notebooks/01_eda.ipynb`: profile coverage, distributions, missingness, and first plots
 - `notebooks/02_analysis.ipynb`: trend and station-hour analysis

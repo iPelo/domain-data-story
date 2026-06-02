@@ -1,9 +1,6 @@
 # Analysis Findings
 
-Phase 4 is captured in `notebooks/02_analysis.ipynb`. The analysis uses a
-descriptive decomposition rather than causal modeling because the dataset has a
-known coverage break and lacks controls for weather, strikes, construction, and
-passenger volume.
+`notebooks/02_analysis.ipynb` uses descriptive decomposition rather than causal modeling. The dataset has a known coverage break and does not include controls for weather, strikes, construction, vehicle availability, or passenger volume.
 
 ## Method
 
@@ -36,7 +33,7 @@ passenger volume.
 7. **Cancellation is not a delay proxy.** Cancellation-share changes are smaller
    and follow different patterns from late-share changes.
 
-## Recommended Headline
+## Draft Headline
 
 Use a stable-station trend chart as the headline:
 

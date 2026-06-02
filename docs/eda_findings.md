@@ -1,12 +1,10 @@
 # EDA Findings
 
-Phase 3 is captured in `notebooks/01_eda.ipynb`. The notebook contains 21
-captioned figures covering coverage, data quality, delay distributions,
-train-type behavior, time windows, stations, and route/service outliers.
+`notebooks/01_eda.ipynb` profiles coverage, data quality, delay distributions, train-type behavior, time windows, stations, and route/service outliers. The main point from EDA is that coverage has to be handled before making any trend claim.
 
 ## Main Findings
 
-- **Coverage is the first-order issue.** The 2025 local dataset is a 107-station
+- **Coverage is the first issue to control.** The 2025 local dataset is a 107-station
   panel from January through October, then expands to more than 5,000 stations
   in November and December. Do not treat the November row jump as an operational
   delay event.
@@ -38,7 +36,7 @@ train-type behavior, time windows, stations, and route/service outliers.
 - The original project question mentions July 2024, but only 2025 files are
   local right now. Download 2024 files or adjust the final question to 2025.
 
-## Phase 4 Recommendation
+## Next Analysis Step
 
 Frame the analysis as a descriptive decomposition:
 

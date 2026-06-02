@@ -22,6 +22,20 @@ dist/
 htmlcov/
 *.log
 
+# Local-only planning files
+DEVELOPMENT.md
+README-*-data-analysis.md
+[Aa][Ii]_HANDOFF.md
+[Cc][Ll][Aa][Uu][Dd][Ee].md
+[Cc][Oo][Dd][Ee][Xx].md
+NOTES.md
+PRIVATE.md
+personal*.md
+private*.md
+local*.md
+*_notes.md
+*_handoff.md
+
 # Secrets and local credentials
 .streamlit/secrets.toml
 secrets.toml
