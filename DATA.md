@@ -1,4 +1,4 @@
-# Data Dictionary
+# Data and Analysis Notes
 
 ## Source and License
 
@@ -8,11 +8,12 @@
 - **Collection:** Built from Deutsche Bahn public APIs (`timetables/v1/plan` and `timetables/v1/fchg`).
 - **This project uses** the `monthly_processed_data/` slice (re-published locally under `yearly_processed_data/`); the raw hourly API responses are not used.
 
-## Coverage Profile (12 files, `data-2025-01` .. `data-2025-12`)
+## Analysis Scope
 
-- Total source rows: 49,014,033. Rows per month sit near 2.0M for January–October, then jump to 13.9M (November) and 15.5M (December). That jump is the documented coverage break, not a delay event — see Known Gotchas.
-- `id` is unique across all 49.0M rows; `id`, `time`, `eva`, and `train_type` have no nulls; `station_name` has 1,218 nulls.
-- `delay_in_min` ranges from -1,440 to 868 minutes; 541 rows fall below -60 and 1 row exceeds 720.
+The notebooks study 2025. Trend comparisons use stations present in every
+month from January through October, before station coverage expands in November.
+The dashboard shows all processed data, so it should not be used alone to draw
+stable-panel trend conclusions.
 
 ## Source: Monthly Processed Parquet
 
@@ -41,7 +42,7 @@ Supported alternate path: `data/raw/monthly_processed_data/data-YYYY-MM.parquet`
 
 ## Clean Table: `stops_clean`
 
-Created by `sql/02_clean_stops.sql`. One row per source stop event that has a
+Created by `src/bahn_delay_story/clean_stops.sql`. One row per source stop event that has a
 non-null `id` and `time`. Blank strings are normalized to NULL.
 
 | Column | Type | Meaning |
@@ -73,7 +74,7 @@ non-null `id` and `time`. Blank strings are normalized to NULL.
 
 ## Feature Tables
 
-Created by `sql/03_features_delay_metrics.sql`.
+Created by `src/bahn_delay_story/delay_metrics.sql`.
 
 | Table | Grain | Use |
 |---|---|---|
@@ -91,25 +92,20 @@ Shared metric columns:
 | `cancellation_share` | `canceled_count / stop_count`, in [0, 1]. |
 | `avg_delay_min`, `median_delay_min` | Mean and median of non-null `delay_min`. |
 | `p90_delay_min` | 90th percentile delay (severe tail). Not in `hourly_delay_metrics`. |
-| `late_share_6_min`, `late_share_15_min` | Share of non-canceled stops at least 6 / 15 minutes late, in [0, 1]. |
+| `late_share_6_min`, `late_share_15_min` | Non-canceled stops at least 6 / 15 minutes late divided by all stops, in [0, 1]. |
 | `late_share_60_min` | Share at least 60 minutes late. Only in `station_day_metrics` and `train_type_day_metrics`. |
 | `station_count`, `ride_count` | Distinct stations / rides in the group (`train_type_day_metrics`, `line_metrics`). |
 
 `line_metrics` keeps only groups with `stop_count >= 100`.
 
-## Quality Checks
-
-`src/bahn_delay_story/quality.py` runs assertions after each pipeline stage
-(source, clean, features). It enforces non-empty tables, `stop_id` uniqueness,
-no null `stop_id`/`event_time`, `delay_min` within the cleaning bounds, the
-canceled-vs-late consistency rule, and shares within [0, 1]. Re-validate a
-finished build with `uv run bahn-quality` (or `python -m bahn_delay_story.quality`).
-
 ## Known Gotchas
 
 - **Coverage break.** The dataset covers the biggest ~100 stations from 2024-07 to 2025-11-02, then all stations after that. This is visible as the ~2M to ~14M monthly row jump in November. Trend analyses must use a stable station set or explicitly model the coverage change.
 - **Stop-level, not passenger-level.** `delay_min` is per stop. A busy hub stop and a tiny halt count equally unless weighted later.
-- **Cancellation vs. delay.** They are related but not interchangeable. A canceled stop is excluded from the `is_late_*` flags and contributes only to cancellation metrics.
-- **Outlier delays become NULL.** 542 source rows have `delay_in_min` outside [-60, 720]; their `delay_min` is set to NULL, so the stop still counts toward `stop_count` and cancellation metrics but not delay averages.
+- **Cancellation vs. delay.** They are related but not interchangeable. A canceled stop is excluded from the `is_late_*` flags. It remains in total stop counts and contributes to delay averages when its cleaned delay is non-null.
+- **Outlier delays become NULL.** For rows with `delay_in_min` outside [-60, 720], `delay_min` is set to NULL, so the stop still counts toward `stop_count` and cancellation metrics but not delay averages.
 - **Time zones.** Source timestamps are naive Europe/Berlin wall-clock time. No UTC conversion is applied; `hour_of_day` and `weekday` are intentionally local clock values.
 - **Correlated observations.** One late train produces many delayed stop rows along its route, so stop-level rows are not independent.
+
+The analysis is descriptive. It does not control for weather, strikes,
+construction, or passenger demand. Missing API calls can also affect coverage.

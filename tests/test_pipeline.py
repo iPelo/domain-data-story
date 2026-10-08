@@ -80,3 +80,72 @@ def test_pipeline_is_idempotent(tmp_path: Path) -> None:
             assert (only_first, only_second) == (0, 0), f"{table} differs between runs"
     finally:
         con.close()
+
+
+def test_pipeline_with_generated_data(tmp_path: Path, monkeypatch) -> None:
+    """Exercise cleaning and exports without downloading the real dataset."""
+    source = tmp_path / "data-2025-01.parquet"
+    with duckdb.connect() as con:
+        con.execute(
+            """
+            CREATE TABLE sample AS
+            SELECT
+              CAST(i AS VARCHAR) AS id,
+              ' Berlin Hbf ' AS station_name,
+              'Berlin Hbf' AS xml_station_name,
+              '8011160' AS eva,
+              'ICE 123' AS train_name,
+              'Hamburg Hbf' AS final_destination_station,
+              CASE
+                WHEN i = 0 THEN -61
+                WHEN i = 1 THEN 721
+                ELSE 10
+              END AS delay_in_min,
+              i = 2 AS is_canceled,
+              ' ice ' AS train_type,
+              'ride-1' AS train_line_ride_id,
+              1 AS train_line_station_num,
+              CASE WHEN i = 123 THEN NULL
+                   ELSE TIMESTAMP '2025-01-01 12:00:00' END AS time,
+              TIMESTAMP '2025-01-01 11:50:00' AS arrival_planned_time,
+              NULL::TIMESTAMP AS arrival_change_time,
+              NULL::TIMESTAMP AS departure_planned_time,
+              NULL::TIMESTAMP AS departure_change_time
+            FROM range(124) AS rows(i)
+            """
+        )
+        con.execute(f"COPY sample TO {duckdb_string_literal(str(source))} (FORMAT PARQUET)")
+
+    monkeypatch.setattr("bahn_delay_story.pipeline.source_parquet_files", lambda: [source])
+    database = tmp_path / "sample.duckdb"
+    output_dir = tmp_path / "processed"
+    report = run_pipeline(database=database, output_dir=output_dir)
+
+    assert report["source"]["rows_raw"] == 124
+    assert report["source"]["null_times"] == 1
+    assert report["clean"]["rows_clean"] == 123
+    assert report["clean"]["null_delay_min"] == 2
+    for table in OUTPUT_TABLES:
+        assert (output_dir / f"{table}.parquet").exists()
+
+    with duckdb.connect(database, read_only=True) as con:
+        assert con.execute(
+            "SELECT DISTINCT station_name, train_type, is_long_distance FROM stops_clean"
+        ).fetchall() == [("Berlin Hbf", "ICE", True)]
+        assert con.execute(
+            "SELECT is_late_6_min, is_late_15_min, is_late_60_min "
+            "FROM stops_clean WHERE stop_id = '2'"
+        ).fetchone() == (False, False, False)
+        stops, canceled, late_share, average_delay = con.execute(
+            "SELECT stop_count, canceled_count, late_share_6_min, avg_delay_min "
+            "FROM train_type_day_metrics"
+        ).fetchone()
+        assert (stops, canceled) == (123, 1)
+        # The high outlier is still flagged late by the existing source-delay rule.
+        assert late_share == pytest.approx(121 / 123)
+        assert average_delay == 10
+
+    from bahn_delay_story.quality import verify_database
+
+    assert verify_database(database) == report
+    assert run_pipeline(database=database, output_dir=output_dir) == report

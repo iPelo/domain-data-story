@@ -3,7 +3,6 @@
 Thumbs.db
 .env
 .env.*
-!.env.example
 .venv/
 venv/
 env/
@@ -45,29 +44,10 @@ token.json
 *.key
 *.p12
 
-# Large/local data artifacts
-data/raw/**
-data/interim/**
-data/processed/**
-data/**/*.parquet
-data/**/*.csv
-data/**/*.csv.gz
-data/**/*.jsonl
-!data/raw/
-!data/raw/monthly_processed_data/
-!data/raw/yearly_processed_data/
-!data/interim/
-!data/processed/
-!data/raw/.gitkeep
-!data/raw/monthly_processed_data/.gitkeep
-!data/raw/yearly_processed_data/.gitkeep
-!data/interim/.gitkeep
-!data/processed/.gitkeep
+# Local datasets and generated charts
+data/
+reports/
 
-# Generated report artifacts
-reports/figures/**
-!reports/figures/
-!reports/figures/.gitkeep
 *.duckdb
 *.duckdb.wal
 *.duckdb.tmp

@@ -9,17 +9,13 @@ DATA_DIR = PROJECT_ROOT / "data"
 RAW_DIR = DATA_DIR / "raw"
 RAW_MONTHLY_DIR = RAW_DIR / "monthly_processed_data"
 RAW_YEARLY_DIR = RAW_DIR / "yearly_processed_data"
-INTERIM_DIR = DATA_DIR / "interim"
 PROCESSED_DIR = DATA_DIR / "processed"
 REPORTS_DIR = PROJECT_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
-SQL_DIR = PROJECT_ROOT / "sql"
+SQL_DIR = Path(__file__).resolve().parent
 DEFAULT_DATABASE = DATA_DIR / "bahn_delay_story.duckdb"
 
 RAW_PROCESSED_DIRS = [RAW_YEARLY_DIR, RAW_MONTHLY_DIR]
-RAW_PROCESSED_GLOBS = [str(path / "data-*.parquet") for path in RAW_PROCESSED_DIRS]
-
-LONG_DISTANCE_TYPES = {"ICE", "IC", "EC", "ECE", "EN", "NJ", "RJ", "RJX", "TGV", "THA"}
 
 
 def source_parquet_files() -> list[Path]:

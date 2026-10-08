@@ -1,21 +1,15 @@
 [project]
 name = "bahn-delay-story"
 version = "0.1.0"
-description = "A reproducible Deutsche Bahn delay data story using DuckDB, Polars, notebooks, Streamlit, and Quarto."
+description = "Deutsche Bahn stop-level delay analysis with DuckDB and Streamlit."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "duckdb>=1.2.0",
-  "polars>=1.20.0",
   "pandas>=2.2.0",
-  "pyarrow>=18.0.0",
   "plotly>=5.24.0",
   "streamlit>=1.40.0",
-  "statsmodels>=0.14.0",
-  "scikit-learn>=1.5.0",
   "huggingface-hub>=0.28.0",
-  "requests>=2.32.0",
-  "python-dotenv>=1.0.1",
   "jupyter>=1.1.1",
   "ipykernel>=6.29.5",
 ]

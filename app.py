@@ -1,17 +1,11 @@
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-import pandas as pd
 import duckdb
+import pandas as pd
 import streamlit as st
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.append(str(ROOT / "src"))
-
-from bahn_delay_story.config import PROCESSED_DIR  # noqa: E402
-from bahn_delay_story.plots import hourly_heatmap, train_type_late_share  # noqa: E402
+from bahn_delay_story.config import PROCESSED_DIR
+from bahn_delay_story.plots import hourly_heatmap, train_type_late_share
 
 st.set_page_config(page_title="BahnDelayStory", layout="wide")
 
@@ -44,8 +38,10 @@ selected_train_types = st.sidebar.multiselect(
 
 if selected_train_types:
     train_type_day = train_type_day[train_type_day["train_type"].isin(selected_train_types)]
-    hourly = hourly[hourly["train_type"].isin(selected_train_types)]
-    line_metrics = line_metrics[line_metrics["train_type"].isin(selected_train_types)]
+    if not hourly.empty:
+        hourly = hourly[hourly["train_type"].isin(selected_train_types)]
+    if not line_metrics.empty:
+        line_metrics = line_metrics[line_metrics["train_type"].isin(selected_train_types)]
 
 total_stops = train_type_day["stop_count"].sum()
 weights = train_type_day["stop_count"].clip(lower=1)
@@ -103,13 +99,15 @@ else:
         ]
     )
     display_lines = top_lines.copy()
-    display_lines["late_share_6_min"] = display_lines["late_share_6_min"].map("{:.1%}".format)
-    display_lines["cancellation_share"] = display_lines["cancellation_share"].map("{:.1%}".format)
-    display_lines["avg_delay_min"] = display_lines["avg_delay_min"].map("{:.1f}".format)
-    display_lines["p90_delay_min"] = display_lines["p90_delay_min"].map("{:.1f}".format)
+    for column in ["late_share_6_min", "cancellation_share"]:
+        display_lines[column] = display_lines[column].map("{:.1%}".format)
 
     st.dataframe(
         display_lines,
+        column_config={
+            "avg_delay_min": st.column_config.NumberColumn(format="%.1f"),
+            "p90_delay_min": st.column_config.NumberColumn(format="%.1f"),
+        },
         use_container_width=True,
         hide_index=True,
     )

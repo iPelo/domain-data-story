@@ -1,16 +1,4 @@
-"""Staged data-quality assertions for the BahnDelayStory pipeline.
-
-Each `check_*` function runs against an already-open DuckDB connection, returns
-a metrics dict, and raises :class:`QualityError` on a hard failure. The pipeline
-calls the three stages in order while it builds:
-
-1. ``check_source``   — after the ``monthly_raw`` view is registered
-2. ``check_clean``    — after ``sql/02_clean_stops.sql``
-3. ``check_features`` — after ``sql/03_features_delay_metrics.sql``
-
-`verify_database` re-runs the same checks read-only against an existing build
-so a finished database can be re-validated without a full rebuild.
-"""
+"""Check source rows, cleaned stops, and aggregated metrics."""
 
 from __future__ import annotations
 
@@ -28,7 +16,7 @@ FEATURE_TABLES = (
     "line_metrics",
 )
 
-# Cleaning bounds applied in sql/02_clean_stops.sql.
+# Cleaning bounds applied in clean_stops.sql.
 DELAY_MIN_FLOOR = -60
 DELAY_MIN_CEIL = 720
 
@@ -43,12 +31,6 @@ class QualityError(AssertionError):
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise QualityError(message)
-
-
-def require_file(path: Path) -> None:
-    """Raise if a required file is missing."""
-    if not path.exists():
-        raise FileNotFoundError(f"Required file does not exist: {path}")
 
 
 def check_source(con: duckdb.DuckDBPyConnection) -> dict[str, int]:
@@ -217,7 +199,8 @@ def format_report(report: dict[str, object]) -> str:
 
 def verify_database(database: Path = DEFAULT_DATABASE) -> dict[str, object]:
     """Re-run every quality check read-only against an existing build."""
-    require_file(database)
+    if not database.exists():
+        raise FileNotFoundError(f"Database does not exist: {database}. Run bahn-pipeline first.")
     with duckdb.connect(str(database), read_only=True) as con:
         report = {
             "source": check_source(con),

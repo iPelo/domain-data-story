@@ -16,8 +16,8 @@ from bahn_delay_story.quality import (
 )
 
 SQL_STEPS = [
-    SQL_DIR / "02_clean_stops.sql",
-    SQL_DIR / "03_features_delay_metrics.sql",
+    SQL_DIR / "clean_stops.sql",
+    SQL_DIR / "delay_metrics.sql",
 ]
 
 OUTPUT_TABLES = [
@@ -39,32 +39,18 @@ def duckdb_path_list(paths: list[Path]) -> str:
     return "[" + ", ".join(duckdb_string_literal(str(path)) for path in paths) + "]"
 
 
-def source_files() -> list[Path]:
-    """Return downloaded processed Parquet files."""
-    return source_parquet_files()
-
-
-def ensure_source_data() -> None:
-    if not source_files():
-        raise FileNotFoundError(
-            "No source Parquet files found in data/raw/yearly_processed_data or "
-            "data/raw/monthly_processed_data. "
-            "Run `uv run bahn-download` or see README.md for Hugging Face download commands."
-        )
-
-
 def run_pipeline(
     database: Path = DEFAULT_DATABASE,
     sample_limit: int | None = None,
     output_dir: Path = PROCESSED_DIR,
 ) -> dict[str, object]:
-    """Build cleaned and aggregated Parquet outputs.
-
-    Quality assertions run after each stage: against the registered source
-    view, against ``stops_clean``, and against the feature tables. Any failure
-    raises and aborts before outputs are written. Returns the quality report.
-    """
-    ensure_source_data()
+    """Build and validate tables, then export them as Parquet files."""
+    files = source_parquet_files()
+    if not files:
+        raise FileNotFoundError(
+            "No source Parquet files found in data/raw/yearly_processed_data or "
+            "data/raw/monthly_processed_data. Run `uv run bahn-download` first."
+        )
     if sample_limit is not None:
         sample_limit = int(sample_limit)
         if sample_limit <= 0:
@@ -74,7 +60,7 @@ def run_pipeline(
     database.parent.mkdir(parents=True, exist_ok=True)
 
     with duckdb.connect(database) as con:
-        source_path_sql = duckdb_path_list(source_files())
+        source_path_sql = duckdb_path_list(files)
         limit_clause = f"\nLIMIT {sample_limit}" if sample_limit else ""
         con.execute(
             f"""
