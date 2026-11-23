@@ -99,6 +99,7 @@ def test_pipeline_with_generated_data(tmp_path: Path, monkeypatch) -> None:
               CASE
                 WHEN i = 0 THEN -61
                 WHEN i = 1 THEN 721
+                WHEN i = 3 THEN NULL
                 ELSE 10
               END AS delay_in_min,
               i = 2 AS is_canceled,
@@ -124,7 +125,8 @@ def test_pipeline_with_generated_data(tmp_path: Path, monkeypatch) -> None:
     assert report["source"]["rows_raw"] == 124
     assert report["source"]["null_times"] == 1
     assert report["clean"]["rows_clean"] == 123
-    assert report["clean"]["null_delay_min"] == 2
+    assert report["clean"]["null_delay_min"] == 3
+    assert report["clean"]["unknown_late_flags"] == 1
     for table in OUTPUT_TABLES:
         assert (output_dir / f"{table}.parquet").exists()
 
@@ -136,13 +138,19 @@ def test_pipeline_with_generated_data(tmp_path: Path, monkeypatch) -> None:
             "SELECT is_late_6_min, is_late_15_min, is_late_60_min "
             "FROM stops_clean WHERE stop_id = '2'"
         ).fetchone() == (False, False, False)
-        stops, canceled, late_share, average_delay = con.execute(
-            "SELECT stop_count, canceled_count, late_share_6_min, avg_delay_min "
-            "FROM train_type_day_metrics"
+        # Unknown delay is unknown lateness, not on time.
+        assert con.execute(
+            "SELECT is_late_6_min, is_late_15_min, is_late_60_min "
+            "FROM stops_clean WHERE stop_id = '3'"
+        ).fetchone() == (None, None, None)
+        stops, canceled, eligible, late, late_share, average_delay = con.execute(
+            "SELECT stop_count, canceled_count, late_eligible_count, late_count_6_min, "
+            "late_share_6_min, avg_delay_min FROM train_type_day_metrics"
         ).fetchone()
-        assert (stops, canceled) == (123, 1)
+        assert (stops, canceled, eligible) == (123, 1, 122)
         # The high outlier is still flagged late by the existing source-delay rule.
-        assert late_share == pytest.approx(121 / 123)
+        assert late == 120
+        assert late_share == pytest.approx(120 / 122)
         assert average_delay == 10
 
     from bahn_delay_story.quality import verify_database

@@ -7,7 +7,10 @@
 --   line_metrics           - per-line/destination outlier ranking
 --
 -- Shares (cancellation_share, late_share_*) are AVG of 0/1 flags, so they are
--- bounded in [0, 1]. line_metrics keeps only groups with >= 100 stops so rare
+-- bounded in [0, 1]. Late flags are NULL when a non-cancelled stop has no
+-- delay value, so AVG skips those stops: late_share_* = late_count_* /
+-- late_eligible_count. Pool rows by summing counts, never by averaging shares.
+-- line_metrics keeps only groups with >= 100 stops so rare
 -- lines do not produce noisy rankings.
 --
 -- Idempotent: CREATE OR REPLACE rebuilds every table from scratch each run.
@@ -25,9 +28,13 @@ SELECT
   AVG(delay_min) AS avg_delay_min,
   MEDIAN(delay_min) AS median_delay_min,
   QUANTILE_CONT(delay_min, 0.9) AS p90_delay_min,
-  AVG(CASE WHEN is_late_6_min THEN 1.0 ELSE 0.0 END) AS late_share_6_min,
-  AVG(CASE WHEN is_late_15_min THEN 1.0 ELSE 0.0 END) AS late_share_15_min,
-  AVG(CASE WHEN is_late_60_min THEN 1.0 ELSE 0.0 END) AS late_share_60_min
+  AVG(CAST(is_late_6_min AS DOUBLE)) AS late_share_6_min,
+  AVG(CAST(is_late_15_min AS DOUBLE)) AS late_share_15_min,
+  AVG(CAST(is_late_60_min AS DOUBLE)) AS late_share_60_min,
+  COUNT(is_late_6_min) AS late_eligible_count,
+  COUNT(*) FILTER (WHERE is_late_6_min) AS late_count_6_min,
+  COUNT(*) FILTER (WHERE is_late_15_min) AS late_count_15_min,
+  COUNT(*) FILTER (WHERE is_late_60_min) AS late_count_60_min
 FROM stops_clean
 GROUP BY ALL;
 
@@ -44,9 +51,13 @@ SELECT
   AVG(delay_min) AS avg_delay_min,
   MEDIAN(delay_min) AS median_delay_min,
   QUANTILE_CONT(delay_min, 0.9) AS p90_delay_min,
-  AVG(CASE WHEN is_late_6_min THEN 1.0 ELSE 0.0 END) AS late_share_6_min,
-  AVG(CASE WHEN is_late_15_min THEN 1.0 ELSE 0.0 END) AS late_share_15_min,
-  AVG(CASE WHEN is_late_60_min THEN 1.0 ELSE 0.0 END) AS late_share_60_min
+  AVG(CAST(is_late_6_min AS DOUBLE)) AS late_share_6_min,
+  AVG(CAST(is_late_15_min AS DOUBLE)) AS late_share_15_min,
+  AVG(CAST(is_late_60_min AS DOUBLE)) AS late_share_60_min,
+  COUNT(is_late_6_min) AS late_eligible_count,
+  COUNT(*) FILTER (WHERE is_late_6_min) AS late_count_6_min,
+  COUNT(*) FILTER (WHERE is_late_15_min) AS late_count_15_min,
+  COUNT(*) FILTER (WHERE is_late_60_min) AS late_count_60_min
 FROM stops_clean
 GROUP BY ALL;
 
@@ -62,8 +73,9 @@ SELECT
   AVG(CASE WHEN is_canceled THEN 1.0 ELSE 0.0 END) AS cancellation_share,
   AVG(delay_min) AS avg_delay_min,
   MEDIAN(delay_min) AS median_delay_min,
-  AVG(CASE WHEN is_late_6_min THEN 1.0 ELSE 0.0 END) AS late_share_6_min,
-  AVG(CASE WHEN is_late_15_min THEN 1.0 ELSE 0.0 END) AS late_share_15_min,
+  AVG(CAST(is_late_6_min AS DOUBLE)) AS late_share_6_min,
+  AVG(CAST(is_late_15_min AS DOUBLE)) AS late_share_15_min,
+  COUNT(is_late_6_min) AS late_eligible_count,
   COUNT(*) FILTER (WHERE is_late_6_min) AS late_count_6_min,
   COUNT(*) FILTER (WHERE is_late_15_min) AS late_count_15_min
 FROM stops_clean
@@ -82,8 +94,11 @@ SELECT
   AVG(delay_min) AS avg_delay_min,
   MEDIAN(delay_min) AS median_delay_min,
   QUANTILE_CONT(delay_min, 0.9) AS p90_delay_min,
-  AVG(CASE WHEN is_late_6_min THEN 1.0 ELSE 0.0 END) AS late_share_6_min,
-  AVG(CASE WHEN is_late_15_min THEN 1.0 ELSE 0.0 END) AS late_share_15_min
+  AVG(CAST(is_late_6_min AS DOUBLE)) AS late_share_6_min,
+  AVG(CAST(is_late_15_min AS DOUBLE)) AS late_share_15_min,
+  COUNT(is_late_6_min) AS late_eligible_count,
+  COUNT(*) FILTER (WHERE is_late_6_min) AS late_count_6_min,
+  COUNT(*) FILTER (WHERE is_late_15_min) AS late_count_15_min
 FROM stops_clean
 GROUP BY ALL
 HAVING COUNT(*) >= 100;

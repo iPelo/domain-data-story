@@ -54,7 +54,9 @@ def weighted_mean(series: pd.Series, weight: pd.Series) -> float:
     return float((series[valid] * weight[valid]).sum() / weight[valid].sum())
 
 
-late_share = weighted_mean(train_type_day["late_share_6_min"], weights)
+late_share = (
+    train_type_day["late_count_6_min"].sum() / train_type_day["late_eligible_count"].sum()
+)
 cancellation_share = weighted_mean(train_type_day["cancellation_share"], weights)
 avg_delay = weighted_mean(train_type_day["avg_delay_min"], weights)
 

@@ -68,9 +68,9 @@ non-null `id` and `time`. Blank strings are normalized to NULL.
 | `hour_of_day` | integer | Local hour 0–23 of `event_time`. |
 | `weekday` | string | Day of week, `'0'` (Sunday) to `'6'` (Saturday). |
 | `is_long_distance` | boolean | True for ICE/IC/EC/ECE/EN/NJ/RJ/RJX/TGV/THA service types. |
-| `is_late_6_min` | boolean | True if not canceled and delay is at least 6 minutes. |
-| `is_late_15_min` | boolean | True if not canceled and delay is at least 15 minutes. |
-| `is_late_60_min` | boolean | True if not canceled and delay is at least 60 minutes. |
+| `is_late_6_min` | boolean | True if not canceled and delay is at least 6 minutes. False if canceled. NULL if not canceled and the delay is unknown. |
+| `is_late_15_min` | boolean | Same rule at 15 minutes. |
+| `is_late_60_min` | boolean | Same rule at 60 minutes. |
 
 ## Feature Tables
 
@@ -92,9 +92,10 @@ Shared metric columns:
 | `cancellation_share` | `canceled_count / stop_count`, in [0, 1]. |
 | `avg_delay_min`, `median_delay_min` | Mean and median of non-null `delay_min`. |
 | `p90_delay_min` | 90th percentile delay (severe tail). Not in `hourly_delay_metrics`. |
-| `late_share_6_min`, `late_share_15_min` | Non-canceled stops at least 6 / 15 minutes late divided by all stops, in [0, 1]. |
+| `late_share_6_min`, `late_share_15_min` | `late_count_*` / `late_eligible_count`, in [0, 1]. NULL if no stop in the group has a known late flag. |
 | `late_share_60_min` | Share at least 60 minutes late. Only in `station_day_metrics` and `train_type_day_metrics`. |
-| `late_count_6_min`, `late_count_15_min` | Stops at least 6 / 15 minutes late (`hourly_delay_metrics`). Sum these and `stop_count` before dividing when pooling rows; do not average the share columns. |
+| `late_eligible_count` | Stops with a known late flag: canceled stops plus non-canceled stops with a delay value. Denominator of every `late_share_*`. |
+| `late_count_6_min`, `late_count_15_min`, `late_count_60_min` | Stops flagged late at each threshold (`late_count_60_min` only where `late_share_60_min` exists). When pooling rows, sum counts and divide by summed `late_eligible_count`; do not average share columns. |
 | `station_count`, `ride_count` | Distinct stations / rides in the group (`train_type_day_metrics`, `line_metrics`). |
 
 `line_metrics` keeps only groups with `stop_count >= 100`.
@@ -103,7 +104,8 @@ Shared metric columns:
 
 - **Coverage break.** The dataset covers the biggest ~100 stations from 2024-07 to 2025-11-02, then all stations after that. This is visible as the ~2M to ~14M monthly row jump in November. Trend analyses must use a stable station set or explicitly model the coverage change.
 - **Stop-level, not passenger-level.** `delay_min` is per stop. A busy hub stop and a tiny halt count equally unless weighted later.
-- **Cancellation vs. delay.** They are related but not interchangeable. A canceled stop is excluded from the `is_late_*` flags. It remains in total stop counts and contributes to delay averages when its cleaned delay is non-null.
+- **Cancellation vs. delay.** They are related but not interchangeable. A canceled stop is never flagged late (its flags are false, not NULL), so it stays in the late-share denominator. It remains in total stop counts and contributes to delay averages when its cleaned delay is non-null.
+- **Unknown delay is not on time.** A non-canceled stop with no delay value has NULL late flags and is left out of late-share denominators. The pipeline reports the number of such rows as `unknown_late_flag`.
 - **Outlier delays become NULL.** For rows with `delay_in_min` outside [-60, 720], `delay_min` is set to NULL, so the stop still counts toward `stop_count` and cancellation metrics but not delay averages.
 - **Time zones.** Source timestamps are naive Europe/Berlin wall-clock time. No UTC conversion is applied; `hour_of_day` and `weekday` are intentionally local clock values.
 - **Correlated observations.** One late train produces many delayed stop rows along its route, so stop-level rows are not independent.

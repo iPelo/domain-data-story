@@ -16,7 +16,7 @@ def test_weekday_hour_late_share_pools_counts() -> None:
             "weekday": ["1", "1"],
             "hour_of_day": [8, 8],
             "late_count_6_min": [1, 10],
-            "stop_count": [1, 100],
+            "late_eligible_count": [1, 100],
         }
     )
 
@@ -34,7 +34,7 @@ def test_hourly_heatmap_uses_weekday_labels() -> None:
             "weekday": ["0", "6"],
             "hour_of_day": [0, 23],
             "late_count_6_min": [1, 2],
-            "stop_count": [4, 4],
+            "late_eligible_count": [4, 4],
         }
     )
 

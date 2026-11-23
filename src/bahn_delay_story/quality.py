@@ -81,7 +81,13 @@ def check_clean(con: duckdb.DuckDBPyConnection) -> dict[str, object]:
           COUNT(DISTINCT station_name),
           COUNT(DISTINCT train_type),
           MIN(service_date),
-          MAX(service_date)
+          MAX(service_date),
+          COUNT(*) FILTER (WHERE is_late_6_min IS NULL),
+          COUNT(*) FILTER (
+            WHERE (is_late_6_min IS NULL) <> (is_late_15_min IS NULL)
+               OR (is_late_6_min IS NULL) <> (is_late_60_min IS NULL)
+               OR (is_canceled AND is_late_6_min IS NULL)
+          )
         FROM stops_clean
         """
     ).fetchone()
@@ -99,6 +105,8 @@ def check_clean(con: duckdb.DuckDBPyConnection) -> dict[str, object]:
         "distinct_train_types": int(row[9]),
         "min_service_date": str(row[10]),
         "max_service_date": str(row[11]),
+        "unknown_late_flags": int(row[12]),
+        "inconsistent_late_flags": int(row[13]),
     }
 
     _require(metrics["rows_clean"] > 0, "stops_clean is empty.")
@@ -121,6 +129,11 @@ def check_clean(con: duckdb.DuckDBPyConnection) -> dict[str, object]:
         metrics["canceled_but_late"] == 0,
         "stops_clean has canceled stops still flagged by an is_late_* column.",
     )
+    _require(
+        metrics["inconsistent_late_flags"] == 0,
+        "stops_clean has is_late_* flags that disagree on NULL, or a NULL flag "
+        "on a canceled stop.",
+    )
     return metrics
 
 
@@ -129,7 +142,7 @@ def check_features(con: duckdb.DuckDBPyConnection) -> dict[str, dict[str, int]]:
     metrics: dict[str, dict[str, int]] = {}
 
     for table in FEATURE_TABLES:
-        rows, bad_shares, canceled_over, bad_stop_count = con.execute(
+        rows, bad_shares, canceled_over, bad_stop_count, bad_late_counts = con.execute(
             f"""
             SELECT
               COUNT(*),
@@ -139,7 +152,11 @@ def check_features(con: duckdb.DuckDBPyConnection) -> dict[str, dict[str, int]]:
                    OR late_share_15_min NOT BETWEEN 0 AND 1
               ),
               COUNT(*) FILTER (WHERE canceled_count > stop_count),
-              COUNT(*) FILTER (WHERE stop_count <= 0)
+              COUNT(*) FILTER (WHERE stop_count <= 0),
+              COUNT(*) FILTER (
+                WHERE late_eligible_count > stop_count
+                   OR late_count_6_min > late_eligible_count
+              )
             FROM {table}
             """
         ).fetchone()
@@ -149,6 +166,7 @@ def check_features(con: duckdb.DuckDBPyConnection) -> dict[str, dict[str, int]]:
             "shares_out_of_range": int(bad_shares),
             "canceled_over_stops": int(canceled_over),
             "nonpositive_stop_count": int(bad_stop_count),
+            "late_counts_out_of_range": int(bad_late_counts),
         }
         _require(table_metrics["rows"] > 0, f"{table} is empty.")
         _require(
@@ -162,6 +180,11 @@ def check_features(con: duckdb.DuckDBPyConnection) -> dict[str, dict[str, int]]:
         _require(
             table_metrics["nonpositive_stop_count"] == 0,
             f"{table} has rows with a non-positive stop_count.",
+        )
+        _require(
+            table_metrics["late_counts_out_of_range"] == 0,
+            f"{table} has late_count_6_min > late_eligible_count or "
+            f"late_eligible_count > stop_count.",
         )
         metrics[table] = table_metrics
 
@@ -189,7 +212,8 @@ def format_report(report: dict[str, object]) -> str:
         f"train_types={clean['distinct_train_types']:,} "
         f"dates {clean['min_service_date']}..{clean['max_service_date']} "
         f"null_delay={clean['null_delay_min']:,} "
-        f"null_station={clean['null_station_names']:,}",
+        f"null_station={clean['null_station_names']:,} "
+        f"unknown_late_flag={clean['unknown_late_flags']:,}",
     ]
     for table, table_metrics in features.items():
         lines.append(f"[quality] feature  {table} rows={table_metrics['rows']:,}")
