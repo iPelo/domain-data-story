@@ -68,7 +68,7 @@ non-null `id` and `time`. Blank strings are normalized to NULL.
 | `service_year`, `service_month` | integer | Year and month of `event_time`. |
 | `hour_of_day` | integer | Local hour 0–23 of `event_time`. |
 | `weekday` | string | Day of week, `'0'` (Sunday) to `'6'` (Saturday). |
-| `is_long_distance` | boolean | True for ICE/IC/EC/ECE/EN/NJ/RJ/RJX/TGV/THA service types. |
+| `is_long_distance` | boolean | True for ICE/IC/EC/ECE/EN/NJ/RJ/RJX/TGV/THA and the open-access long-distance codes EST (Eurostar), FLX/DPF (FlixTrain), WB (WESTbahn), ES (European Sleeper), D and UEX. False for regional operator codes such as HLB, VIA or SBB. |
 | `is_late_6_min` | boolean | True if not canceled and `delay_min` is at least 6. False if canceled. NULL if not canceled and `delay_min` is NULL (missing or out of range). |
 | `is_late_15_min` | boolean | Same rule at 15 minutes. |
 | `is_late_60_min` | boolean | Same rule at 60 minutes. |

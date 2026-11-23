@@ -71,11 +71,18 @@ WITH cleaned AS (
     EXTRACT(MONTH FROM time) AS service_month,
     EXTRACT(HOUR FROM time) AS hour_of_day,
     STRFTIME(time, '%w') AS weekday,
-    CASE
-      WHEN UPPER(NULLIF(TRIM(train_type), '')) IN ('ICE', 'IC', 'EC', 'ECE', 'EN', 'NJ', 'RJ', 'RJX', 'TGV', 'THA')
-        THEN true
-      ELSE false
-    END AS is_long_distance,
+    -- Long-distance products. Besides DB and international trains this covers
+    -- open-access operators seen in the 2025 data: FLX/DPF (FlixTrain), WB
+    -- (WESTbahn), EST (Eurostar, formerly THA/Thalys), ES (European Sleeper),
+    -- D (long-distance 'Fern' trains) and UEX (holiday night train). Regional
+    -- operator codes (HLB, VIA, SBB, ...) stay false.
+    COALESCE(
+      UPPER(NULLIF(TRIM(train_type), '')) IN (
+        'ICE', 'IC', 'EC', 'ECE', 'EN', 'NJ', 'RJ', 'RJX', 'TGV', 'THA',
+        'EST', 'FLX', 'DPF', 'WB', 'ES', 'D', 'UEX'
+      ),
+      false
+    ) AS is_long_distance,
     CASE
       WHEN is_canceled THEN false
       WHEN delay_min IS NULL THEN NULL

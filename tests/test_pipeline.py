@@ -11,7 +11,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
-from bahn_delay_story.config import source_parquet_files
+from bahn_delay_story.config import SQL_DIR, source_parquet_files
 from bahn_delay_story.pipeline import OUTPUT_TABLES, duckdb_string_literal, run_pipeline
 from bahn_delay_story.quality import FEATURE_TABLES
 
@@ -178,6 +178,32 @@ def test_pipeline_with_generated_data(tmp_path: Path, monkeypatch) -> None:
 
     assert verify_database(database) == report
     assert run_pipeline(database=database, output_dir=output_dir) == report
+
+
+@pytest.mark.parametrize(
+    ("train_type", "expected"),
+    [("ICE", True), ("flx", True), ("EST", True), ("RE", False), ("SBB", False), (None, False)],
+)
+def test_long_distance_flag(tmp_path: Path, train_type: str | None, expected: bool) -> None:
+    with duckdb.connect() as con:
+        con.execute(
+            """
+            CREATE VIEW monthly_raw AS
+            SELECT
+              '1' AS id, 'A' AS station_name, 'A' AS xml_station_name, '1' AS eva,
+              '1' AS train_number, NULL::VARCHAR AS line_number, 'B' AS final_destination_station,
+              0 AS delay_in_min, false AS arrival_is_canceled, false AS departure_is_canceled,
+              $train_type::VARCHAR AS train_type, false AS is_additional_stop,
+              false AS is_replacement_train, NULL::VARCHAR AS replaced_train_type,
+              NULL::VARCHAR AS replaced_train_number, true AS has_plan_record,
+              'r' AS train_line_ride_id, 1 AS train_line_station_num,
+              TIMESTAMP '2025-01-01 08:00' AS time,
+              NULL::TIMESTAMP AS arrival_planned_time, NULL::TIMESTAMP AS arrival_change_time,
+              NULL::TIMESTAMP AS departure_planned_time, NULL::TIMESTAMP AS departure_change_time
+            """.replace("$train_type", "NULL" if train_type is None else f"'{train_type}'")
+        )
+        con.execute((SQL_DIR / "clean_stops.sql").read_text())
+        assert con.execute("SELECT is_long_distance FROM stops_clean").fetchone() == (expected,)
 
 
 def test_stable_panel_flag(tmp_path: Path, monkeypatch) -> None:
