@@ -94,6 +94,7 @@ Shared metric columns:
 | `p90_delay_min` | 90th percentile delay (severe tail). Not in `hourly_delay_metrics`. |
 | `late_share_6_min`, `late_share_15_min` | Non-canceled stops at least 6 / 15 minutes late divided by all stops, in [0, 1]. |
 | `late_share_60_min` | Share at least 60 minutes late. Only in `station_day_metrics` and `train_type_day_metrics`. |
+| `late_count_6_min`, `late_count_15_min` | Stops at least 6 / 15 minutes late (`hourly_delay_metrics`). Sum these and `stop_count` before dividing when pooling rows; do not average the share columns. |
 | `station_count`, `ride_count` | Distinct stations / rides in the group (`train_type_day_metrics`, `line_metrics`). |
 
 `line_metrics` keeps only groups with `stop_count >= 100`.

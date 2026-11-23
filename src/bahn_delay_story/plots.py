@@ -25,20 +25,33 @@ def train_type_late_share(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
+WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+
+def weekday_hour_late_share(df: pd.DataFrame) -> pd.DataFrame:
+    """Pool late stops and stops into a weekday x hour grid of late share.
+
+    Rows are summed before dividing, so each cell is total late stops over total
+    stops rather than an unweighted mean of group-level rates. Weekday codes
+    '0'..'6' (Sunday first) become Sun..Sat row labels.
+    """
+    cells = df.groupby(["weekday", "hour_of_day"], as_index=False)[
+        ["late_count_6_min", "stop_count"]
+    ].sum()
+    cells["late_share_6_min"] = cells["late_count_6_min"] / cells["stop_count"]
+    grid = cells.pivot(index="weekday", columns="hour_of_day", values="late_share_6_min")
+    grid = grid.reindex(index=[str(day) for day in range(7)], columns=range(24))
+    grid.index = WEEKDAY_LABELS
+    return grid
+
+
 def hourly_heatmap(df: pd.DataFrame) -> go.Figure:
-    """Heatmap of late share by weekday and hour."""
-    fig = px.density_heatmap(
-        df,
-        x="hour_of_day",
-        y="weekday",
-        z="late_share_6_min",
-        histfunc="avg",
+    """Heatmap of pooled late share by weekday and hour."""
+    fig = px.imshow(
+        weekday_hour_late_share(df),
+        aspect="auto",
         color_continuous_scale="YlOrRd",
-        labels={
-            "hour_of_day": "Hour",
-            "weekday": "Weekday",
-            "late_share_6_min": "Share 6+ min late",
-        },
+        labels={"x": "Hour", "y": "Weekday", "color": "Share 6+ min late"},
     )
     fig.update_layout(coloraxis_colorbar_tickformat=".0%")
     return fig

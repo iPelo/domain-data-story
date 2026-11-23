@@ -63,7 +63,9 @@ SELECT
   AVG(delay_min) AS avg_delay_min,
   MEDIAN(delay_min) AS median_delay_min,
   AVG(CASE WHEN is_late_6_min THEN 1.0 ELSE 0.0 END) AS late_share_6_min,
-  AVG(CASE WHEN is_late_15_min THEN 1.0 ELSE 0.0 END) AS late_share_15_min
+  AVG(CASE WHEN is_late_15_min THEN 1.0 ELSE 0.0 END) AS late_share_15_min,
+  COUNT(*) FILTER (WHERE is_late_6_min) AS late_count_6_min,
+  COUNT(*) FILTER (WHERE is_late_15_min) AS late_count_15_min
 FROM stops_clean
 GROUP BY ALL;
 
