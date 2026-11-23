@@ -86,7 +86,8 @@ def check_clean(con: duckdb.DuckDBPyConnection) -> dict[str, object]:
           COUNT(*) FILTER (
             WHERE (is_late_6_min IS NULL) <> (is_late_15_min IS NULL)
                OR (is_late_6_min IS NULL) <> (is_late_60_min IS NULL)
-               OR (is_canceled AND is_late_6_min IS NULL)
+               OR (is_late_6_min IS NULL) <> (NOT is_canceled AND delay_min IS NULL)
+               OR (NOT is_canceled AND is_late_6_min <> (delay_min >= 6))
           )
         FROM stops_clean
         """
@@ -131,8 +132,8 @@ def check_clean(con: duckdb.DuckDBPyConnection) -> dict[str, object]:
     )
     _require(
         metrics["inconsistent_late_flags"] == 0,
-        "stops_clean has is_late_* flags that disagree on NULL, or a NULL flag "
-        "on a canceled stop.",
+        "stops_clean has is_late_* flags that disagree with delay_min, is_canceled, "
+        "or each other on NULL.",
     )
     return metrics
 

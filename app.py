@@ -58,7 +58,7 @@ late_share = (
     train_type_day["late_count_6_min"].sum() / train_type_day["late_eligible_count"].sum()
 )
 cancellation_share = weighted_mean(train_type_day["cancellation_share"], weights)
-avg_delay = weighted_mean(train_type_day["avg_delay_min"], weights)
+avg_delay = weighted_mean(train_type_day["avg_delay_min"], train_type_day["delay_count"])
 
 metric_cols = st.columns(4)
 metric_cols[0].metric("Stops", f"{total_stops:,.0f}")

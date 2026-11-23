@@ -99,6 +99,7 @@ def test_pipeline_with_generated_data(tmp_path: Path, monkeypatch) -> None:
               CASE
                 WHEN i = 0 THEN -61
                 WHEN i = 1 THEN 721
+                WHEN i = 2 THEN 100
                 WHEN i = 3 THEN NULL
                 ELSE 10
               END AS delay_in_min,
@@ -126,7 +127,8 @@ def test_pipeline_with_generated_data(tmp_path: Path, monkeypatch) -> None:
     assert report["source"]["null_times"] == 1
     assert report["clean"]["rows_clean"] == 123
     assert report["clean"]["null_delay_min"] == 3
-    assert report["clean"]["unknown_late_flags"] == 1
+    # Out-of-range delays (-61, 721) and the missing delay leave lateness unknown.
+    assert report["clean"]["unknown_late_flags"] == 3
     for table in OUTPUT_TABLES:
         assert (output_dir / f"{table}.parquet").exists()
 
@@ -138,20 +140,26 @@ def test_pipeline_with_generated_data(tmp_path: Path, monkeypatch) -> None:
             "SELECT is_late_6_min, is_late_15_min, is_late_60_min "
             "FROM stops_clean WHERE stop_id = '2'"
         ).fetchone() == (False, False, False)
-        # Unknown delay is unknown lateness, not on time.
-        assert con.execute(
-            "SELECT is_late_6_min, is_late_15_min, is_late_60_min "
-            "FROM stops_clean WHERE stop_id = '3'"
-        ).fetchone() == (None, None, None)
-        stops, canceled, eligible, late, late_share, average_delay = con.execute(
-            "SELECT stop_count, canceled_count, late_eligible_count, late_count_6_min, "
-            "late_share_6_min, avg_delay_min FROM train_type_day_metrics"
-        ).fetchone()
-        assert (stops, canceled, eligible) == (123, 1, 122)
-        # The high outlier is still flagged late by the existing source-delay rule.
-        assert late == 120
-        assert late_share == pytest.approx(120 / 122)
+        # Unknown or out-of-range delay is unknown lateness, not on time.
+        for stop_id in ("0", "1", "3"):
+            assert con.execute(
+                "SELECT is_late_6_min, is_late_15_min, is_late_60_min "
+                f"FROM stops_clean WHERE stop_id = '{stop_id}'"
+            ).fetchone() == (None, None, None)
+        stops, canceled, eligible, late, late_share, delay_count, average_delay, p90 = (
+            con.execute(
+                "SELECT stop_count, canceled_count, late_eligible_count, late_count_6_min, "
+                "late_share_6_min, delay_count, avg_delay_min, p90_delay_min "
+                "FROM train_type_day_metrics"
+            ).fetchone()
+        )
+        assert (stops, canceled, eligible) == (123, 1, 120)
+        assert late == 119
+        assert late_share == pytest.approx(119 / 120)
+        # The cancelled stop's 100-minute delay is excluded from delay statistics.
+        assert delay_count == 119
         assert average_delay == 10
+        assert p90 == 10
 
     from bahn_delay_story.quality import verify_database
 

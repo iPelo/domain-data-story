@@ -10,6 +10,8 @@
 -- bounded in [0, 1]. Late flags are NULL when a non-cancelled stop has no
 -- delay value, so AVG skips those stops: late_share_* = late_count_* /
 -- late_eligible_count. Pool rows by summing counts, never by averaging shares.
+-- Delay statistics (avg/median/p90) cover non-cancelled stops with a delay
+-- value; delay_count is that row count, the weight for pooling averages.
 -- line_metrics keeps only groups with >= 100 stops so rare
 -- lines do not produce noisy rankings.
 --
@@ -25,12 +27,13 @@ SELECT
   COUNT(*) AS stop_count,
   SUM(CASE WHEN is_canceled THEN 1 ELSE 0 END) AS canceled_count,
   AVG(CASE WHEN is_canceled THEN 1.0 ELSE 0.0 END) AS cancellation_share,
-  AVG(delay_min) AS avg_delay_min,
-  MEDIAN(delay_min) AS median_delay_min,
-  QUANTILE_CONT(delay_min, 0.9) AS p90_delay_min,
+  AVG(delay_min) FILTER (WHERE NOT is_canceled) AS avg_delay_min,
+  MEDIAN(delay_min) FILTER (WHERE NOT is_canceled) AS median_delay_min,
+  QUANTILE_CONT(delay_min, 0.9) FILTER (WHERE NOT is_canceled) AS p90_delay_min,
   AVG(CAST(is_late_6_min AS DOUBLE)) AS late_share_6_min,
   AVG(CAST(is_late_15_min AS DOUBLE)) AS late_share_15_min,
   AVG(CAST(is_late_60_min AS DOUBLE)) AS late_share_60_min,
+  COUNT(delay_min) FILTER (WHERE NOT is_canceled) AS delay_count,
   COUNT(is_late_6_min) AS late_eligible_count,
   COUNT(*) FILTER (WHERE is_late_6_min) AS late_count_6_min,
   COUNT(*) FILTER (WHERE is_late_15_min) AS late_count_15_min,
@@ -48,12 +51,13 @@ SELECT
   COUNT(DISTINCT train_line_ride_id) AS ride_count,
   SUM(CASE WHEN is_canceled THEN 1 ELSE 0 END) AS canceled_count,
   AVG(CASE WHEN is_canceled THEN 1.0 ELSE 0.0 END) AS cancellation_share,
-  AVG(delay_min) AS avg_delay_min,
-  MEDIAN(delay_min) AS median_delay_min,
-  QUANTILE_CONT(delay_min, 0.9) AS p90_delay_min,
+  AVG(delay_min) FILTER (WHERE NOT is_canceled) AS avg_delay_min,
+  MEDIAN(delay_min) FILTER (WHERE NOT is_canceled) AS median_delay_min,
+  QUANTILE_CONT(delay_min, 0.9) FILTER (WHERE NOT is_canceled) AS p90_delay_min,
   AVG(CAST(is_late_6_min AS DOUBLE)) AS late_share_6_min,
   AVG(CAST(is_late_15_min AS DOUBLE)) AS late_share_15_min,
   AVG(CAST(is_late_60_min AS DOUBLE)) AS late_share_60_min,
+  COUNT(delay_min) FILTER (WHERE NOT is_canceled) AS delay_count,
   COUNT(is_late_6_min) AS late_eligible_count,
   COUNT(*) FILTER (WHERE is_late_6_min) AS late_count_6_min,
   COUNT(*) FILTER (WHERE is_late_15_min) AS late_count_15_min,
@@ -71,10 +75,11 @@ SELECT
   COUNT(*) AS stop_count,
   SUM(CASE WHEN is_canceled THEN 1 ELSE 0 END) AS canceled_count,
   AVG(CASE WHEN is_canceled THEN 1.0 ELSE 0.0 END) AS cancellation_share,
-  AVG(delay_min) AS avg_delay_min,
-  MEDIAN(delay_min) AS median_delay_min,
+  AVG(delay_min) FILTER (WHERE NOT is_canceled) AS avg_delay_min,
+  MEDIAN(delay_min) FILTER (WHERE NOT is_canceled) AS median_delay_min,
   AVG(CAST(is_late_6_min AS DOUBLE)) AS late_share_6_min,
   AVG(CAST(is_late_15_min AS DOUBLE)) AS late_share_15_min,
+  COUNT(delay_min) FILTER (WHERE NOT is_canceled) AS delay_count,
   COUNT(is_late_6_min) AS late_eligible_count,
   COUNT(*) FILTER (WHERE is_late_6_min) AS late_count_6_min,
   COUNT(*) FILTER (WHERE is_late_15_min) AS late_count_15_min
@@ -91,11 +96,12 @@ SELECT
   COUNT(DISTINCT train_line_ride_id) AS ride_count,
   SUM(CASE WHEN is_canceled THEN 1 ELSE 0 END) AS canceled_count,
   AVG(CASE WHEN is_canceled THEN 1.0 ELSE 0.0 END) AS cancellation_share,
-  AVG(delay_min) AS avg_delay_min,
-  MEDIAN(delay_min) AS median_delay_min,
-  QUANTILE_CONT(delay_min, 0.9) AS p90_delay_min,
+  AVG(delay_min) FILTER (WHERE NOT is_canceled) AS avg_delay_min,
+  MEDIAN(delay_min) FILTER (WHERE NOT is_canceled) AS median_delay_min,
+  QUANTILE_CONT(delay_min, 0.9) FILTER (WHERE NOT is_canceled) AS p90_delay_min,
   AVG(CAST(is_late_6_min AS DOUBLE)) AS late_share_6_min,
   AVG(CAST(is_late_15_min AS DOUBLE)) AS late_share_15_min,
+  COUNT(delay_min) FILTER (WHERE NOT is_canceled) AS delay_count,
   COUNT(is_late_6_min) AS late_eligible_count,
   COUNT(*) FILTER (WHERE is_late_6_min) AS late_count_6_min,
   COUNT(*) FILTER (WHERE is_late_15_min) AS late_count_15_min

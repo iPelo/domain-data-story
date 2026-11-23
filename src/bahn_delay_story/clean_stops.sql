@@ -7,9 +7,10 @@
 --                      rows with a null id or time are dropped (WHERE clause).
 --   * Outliers       - delay_in_min outside [-60, 720] is set to NULL rather
 --                      than dropped, so the stop still counts for other metrics.
---   * Unknown delay  - is_late_* flags are NULL for non-cancelled stops with no
---                      delay value, so they drop out of late-share denominators
---                      instead of counting as on time. Cancelled stops are false.
+--   * Unknown delay  - is_late_* flags use the cleaned delay_min. They are NULL
+--                      for non-cancelled stops whose delay is missing or out of
+--                      range, so they drop out of late-share denominators instead
+--                      of counting as on time. Cancelled stops are false.
 --   * Encoding       - source Parquet is UTF-8; station names keep their umlauts.
 --   * Time zones     - source timestamps are naive Europe/Berlin wall-clock time.
 --                      No UTC conversion is applied: hour_of_day and weekday are
@@ -50,18 +51,18 @@ SELECT
   END AS is_long_distance,
   CASE
     WHEN COALESCE(CAST(is_canceled AS BOOLEAN), false) THEN false
-    WHEN delay_in_min IS NULL THEN NULL
-    ELSE delay_in_min >= 6
+    WHEN delay_min IS NULL THEN NULL
+    ELSE delay_min >= 6
   END AS is_late_6_min,
   CASE
     WHEN COALESCE(CAST(is_canceled AS BOOLEAN), false) THEN false
-    WHEN delay_in_min IS NULL THEN NULL
-    ELSE delay_in_min >= 15
+    WHEN delay_min IS NULL THEN NULL
+    ELSE delay_min >= 15
   END AS is_late_15_min,
   CASE
     WHEN COALESCE(CAST(is_canceled AS BOOLEAN), false) THEN false
-    WHEN delay_in_min IS NULL THEN NULL
-    ELSE delay_in_min >= 60
+    WHEN delay_min IS NULL THEN NULL
+    ELSE delay_min >= 60
   END AS is_late_60_min
 FROM monthly_raw
 WHERE id IS NOT NULL
