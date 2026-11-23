@@ -1,10 +1,10 @@
 # BahnDelayStory
 
-**Deutsche Bahn trains got later through 2025.** On a stable panel of
-`[TODO]` large stations, the share of stops at least 6 minutes late rose from
-`[TODO]`% in January to `[TODO]`% in October. High-volume regional services
-added the most late stops, even though long-distance trains have the highest
-late share *(confirm after re-run)*.
+**Deutsche Bahn trains got later through 2025.** On a stable panel of 107
+large stations, the share of stops at least 6 minutes late rose from 14.4% in
+January to 21.9% in October. Long-distance trains are the latest, at 47.9% in
+October, but regional RE, S and RB services added two thirds (67%) of the
+extra late stops because they run far more stops.
 
 ![Monthly late share by service segment, stable station panel](reports/figures/stable_trend.png)
 
@@ -14,7 +14,7 @@ The full write-up with all eight findings is in [REPORT.md](REPORT.md).
 
 ## What's Inside
 
-- A DuckDB pipeline that cleans about `[TODO]`M stop events and checks keys,
+- A DuckDB pipeline that cleans 49.7M stop events and checks keys,
   delay bounds, late-flag consistency and share ranges on every run.
 - Notebooks for exploration (`01_eda`), the stable-panel analysis
   (`02_analysis`) and interactive chart export (`03_post_figures`).
@@ -50,7 +50,7 @@ tables stay local.
 
 ## Method Notes
 
-Station coverage expands from about 100 stations to all stations in November
+Station coverage expands from 107 stations to more than 5,000 in November
 2025, so trend claims use stations present in every month January–October.
 Late share counts cancelled stops as not late and leaves out stops with an
 unknown delay. Delay minutes cover non-cancelled stops only. The analysis is
