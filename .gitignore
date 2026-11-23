@@ -44,9 +44,12 @@ token.json
 *.key
 *.p12
 
-# Local datasets and generated charts
+# Local datasets and generated charts; report PNGs are committed
 data/
-reports/
+reports/*
+!reports/figures/
+reports/figures/*
+!reports/figures/*.png
 
 *.duckdb
 *.duckdb.wal

@@ -12,6 +12,7 @@ dependencies = [
   "huggingface-hub>=0.28.0",
   "jupyter>=1.1.1",
   "ipykernel>=6.29.5",
+  "kaleido>=1.0",
 ]
 
 [project.optional-dependencies]
@@ -24,6 +25,7 @@ dev = [
 bahn-download = "bahn_delay_story.ingest:main"
 bahn-pipeline = "bahn_delay_story.pipeline:main"
 bahn-quality = "bahn_delay_story.quality:main"
+bahn-figures = "bahn_delay_story.figures:main"
 
 [build-system]
 requires = ["hatchling"]
