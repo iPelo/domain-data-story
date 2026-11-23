@@ -94,7 +94,8 @@ def test_pipeline_with_generated_data(tmp_path: Path, monkeypatch) -> None:
               ' Berlin Hbf ' AS station_name,
               'Berlin Hbf' AS xml_station_name,
               '8011160' AS eva,
-              'ICE 123' AS train_name,
+              '123' AS train_number,
+              CASE WHEN i = 5 THEN 'L9' END AS line_number,
               'Hamburg Hbf' AS final_destination_station,
               CASE
                 WHEN i = 0 THEN -61
@@ -103,7 +104,13 @@ def test_pipeline_with_generated_data(tmp_path: Path, monkeypatch) -> None:
                 WHEN i = 3 THEN NULL
                 ELSE 10
               END AS delay_in_min,
-              i = 2 AS is_canceled,
+              i = 2 AS arrival_is_canceled,
+              i = 4 AS departure_is_canceled,
+              false AS is_additional_stop,
+              false AS is_replacement_train,
+              NULL::VARCHAR AS replaced_train_type,
+              NULL::VARCHAR AS replaced_train_number,
+              true AS has_plan_record,
               ' ice ' AS train_type,
               'ride-1' AS train_line_ride_id,
               1 AS train_line_station_num,
@@ -136,10 +143,16 @@ def test_pipeline_with_generated_data(tmp_path: Path, monkeypatch) -> None:
         assert con.execute(
             "SELECT DISTINCT station_name, train_type, is_long_distance FROM stops_clean"
         ).fetchall() == [("Berlin Hbf", "ICE", True)]
+        # Line number wins over train number when present.
         assert con.execute(
-            "SELECT is_late_6_min, is_late_15_min, is_late_60_min "
-            "FROM stops_clean WHERE stop_id = '2'"
-        ).fetchone() == (False, False, False)
+            "SELECT train_name, COUNT(*) FROM stops_clean GROUP BY 1 ORDER BY 1"
+        ).fetchall() == [("ICE 123", 122), ("ICE L9", 1)]
+        # Arrival-only (2) and departure-only (4) cancellations both count.
+        for stop_id in ("2", "4"):
+            assert con.execute(
+                "SELECT is_canceled, is_late_6_min, is_late_15_min, is_late_60_min "
+                f"FROM stops_clean WHERE stop_id = '{stop_id}'"
+            ).fetchone() == (True, False, False, False)
         # Unknown or out-of-range delay is unknown lateness, not on time.
         for stop_id in ("0", "1", "3"):
             assert con.execute(
@@ -153,11 +166,11 @@ def test_pipeline_with_generated_data(tmp_path: Path, monkeypatch) -> None:
                 "FROM train_type_day_metrics"
             ).fetchone()
         )
-        assert (stops, canceled, eligible) == (123, 1, 120)
-        assert late == 119
-        assert late_share == pytest.approx(119 / 120)
+        assert (stops, canceled, eligible) == (123, 2, 120)
+        assert late == 118
+        assert late_share == pytest.approx(118 / 120)
         # The cancelled stop's 100-minute delay is excluded from delay statistics.
-        assert delay_count == 119
+        assert delay_count == 118
         assert average_delay == 10
         assert p90 == 10
 
@@ -191,10 +204,17 @@ def test_stable_panel_flag(tmp_path: Path, monkeypatch) -> None:
                 station_name,
                 station_name AS xml_station_name,
                 '1' AS eva,
-                'ICE 1' AS train_name,
+                '1' AS train_number,
+                NULL::VARCHAR AS line_number,
                 'End' AS final_destination_station,
                 delay_in_min,
-                false AS is_canceled,
+                false AS arrival_is_canceled,
+                false AS departure_is_canceled,
+                false AS is_additional_stop,
+                false AS is_replacement_train,
+                NULL::VARCHAR AS replaced_train_type,
+                NULL::VARCHAR AS replaced_train_number,
+                true AS has_plan_record,
                 'ICE' AS train_type,
                 'ride-1' AS train_line_ride_id,
                 1 AS train_line_station_num,

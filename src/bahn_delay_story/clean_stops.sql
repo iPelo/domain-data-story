@@ -3,6 +3,16 @@
 -- Real-world mess handled here:
 --   * Schema drift   - the pipeline registers monthly_raw with union_by_name,
 --                      so columns missing in one month do not break the read.
+--                      The source no longer has train_name or is_canceled:
+--                      train_name is rebuilt as train_type plus line_number,
+--                      falling back to train_number: 'HLB RB21' for a line,
+--                      'ICE 823' for a train with no line. Rows with no
+--                      train_type, or neither line nor number, get NULL.
+--   * Cancellation   - the source flags arrival and departure separately. A stop
+--                      counts as cancelled if either is cancelled. This includes
+--                      partial cancellations where the train still arrives but
+--                      does not depart (or the reverse), so it is a broad
+--                      definition; both source flags are kept for narrower ones.
 --   * Missingness    - blank strings are normalized to NULL via NULLIF(TRIM(...));
 --                      rows with a null id or time are dropped (WHERE clause).
 --   * Outliers       - delay_in_min outside [-60, 720] is set to NULL rather
@@ -29,13 +39,25 @@ WITH cleaned AS (
     NULLIF(TRIM(station_name), '') AS station_name,
     NULLIF(TRIM(xml_station_name), '') AS xml_station_name,
     CAST(eva AS VARCHAR) AS eva,
-    NULLIF(TRIM(train_name), '') AS train_name,
+    UPPER(NULLIF(TRIM(train_type), '')) || ' '
+      || COALESCE(NULLIF(TRIM(line_number), ''), NULLIF(TRIM(train_number), ''))
+      AS train_name,
+    NULLIF(TRIM(train_number), '') AS train_number,
+    NULLIF(TRIM(line_number), '') AS line_number,
     NULLIF(TRIM(final_destination_station), '') AS final_destination_station,
     CASE
       WHEN delay_in_min < -60 OR delay_in_min > 720 THEN NULL
       ELSE CAST(delay_in_min AS INTEGER)
     END AS delay_min,
-    COALESCE(CAST(is_canceled AS BOOLEAN), false) AS is_canceled,
+    COALESCE(arrival_is_canceled, false) OR COALESCE(departure_is_canceled, false)
+      AS is_canceled,
+    arrival_is_canceled,
+    departure_is_canceled,
+    is_additional_stop,
+    is_replacement_train,
+    UPPER(NULLIF(TRIM(replaced_train_type), '')) AS replaced_train_type,
+    NULLIF(TRIM(replaced_train_number), '') AS replaced_train_number,
+    has_plan_record,
     UPPER(NULLIF(TRIM(train_type), '')) AS train_type,
     CAST(train_line_ride_id AS VARCHAR) AS train_line_ride_id,
     CAST(train_line_station_num AS INTEGER) AS train_line_station_num,
@@ -55,17 +77,17 @@ WITH cleaned AS (
       ELSE false
     END AS is_long_distance,
     CASE
-      WHEN COALESCE(CAST(is_canceled AS BOOLEAN), false) THEN false
+      WHEN is_canceled THEN false
       WHEN delay_min IS NULL THEN NULL
       ELSE delay_min >= 6
     END AS is_late_6_min,
     CASE
-      WHEN COALESCE(CAST(is_canceled AS BOOLEAN), false) THEN false
+      WHEN is_canceled THEN false
       WHEN delay_min IS NULL THEN NULL
       ELSE delay_min >= 15
     END AS is_late_15_min,
     CASE
-      WHEN COALESCE(CAST(is_canceled AS BOOLEAN), false) THEN false
+      WHEN is_canceled THEN false
       WHEN delay_min IS NULL THEN NULL
       ELSE delay_min >= 60
     END AS is_late_60_min
