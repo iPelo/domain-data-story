@@ -6,7 +6,7 @@
 - **License:** CC BY 4.0 (Attribution 4.0 International), <https://creativecommons.org/licenses/by/4.0/>.
 - **Required attribution:** "Data sourced from Deutsche Bahn's public APIs. Special thanks to Deutsche Bahn for providing open access to this data."
 - **Collection:** Built from Deutsche Bahn public APIs (`timetables/v1/plan` and `timetables/v1/fchg`).
-- **This project uses** the `monthly_processed_data/` slice (re-published locally under `yearly_processed_data/`); the raw hourly API responses are not used.
+- **This project uses** the `monthly_processed_data/` slice; the raw hourly API responses are not used.
 
 ## Analysis Scope
 
@@ -18,21 +18,29 @@ stop, which mixes in the coverage break.
 
 ## Source: Monthly Processed Parquet
 
-Expected local path: `data/raw/yearly_processed_data/data-YYYY-MM.parquet`
+Local path: `data/raw/monthly_processed_data/data-YYYY-MM.parquet`. The pipeline
+reads only this folder; files in the older `yearly_processed_data/` layout use a
+different schema and are not supported.
 
-Supported alternate path: `data/raw/monthly_processed_data/data-YYYY-MM.parquet`
+Null counts below are for the 12 files of 2025 (49,681,904 rows).
 
 | Column | Type | Meaning |
 |---|---|---|
-| `station_name` | string | Station name after source processing. May be null (~1.2k rows). |
+| `station_name` | string | Station name after source processing. Null in 1,538 rows. |
 | `xml_station_name` | string | Station name from the API XML response. |
 | `eva` | string | EVA station number, used as a station identifier. |
-| `train_name` | string | Train display name, such as `ICE 123` or `RE 5`. |
-| `final_destination_station` | string | Final destination of the service. |
+| `train_number` | string | Train number, such as `86370`. |
+| `line_number` | string | Line, such as `S6` or `RB21`. Null in 2.8M rows. |
+| `final_destination_station` | string | Final destination of the service. Null in 231k rows. |
 | `delay_in_min` | integer | Delay in minutes. Negative values are early arrivals/departures. |
 | `time` | timestamp (ns) | Actual or changed arrival/departure event time. Naive local (Europe/Berlin) wall-clock time. |
-| `is_canceled` | boolean | Whether the stop was canceled. |
-| `train_type` | string | Service family, such as `ICE`, `IC`, `RE`, `RB`, `S`, or `Bus`. |
+| `arrival_is_canceled` | boolean | Whether the arrival at this stop was canceled. |
+| `departure_is_canceled` | boolean | Whether the departure from this stop was canceled. |
+| `train_type` | string | Product or operator code: `ICE`, `IC`, `RE`, `RB`, `S`, `BUS`, but also operator codes such as `HLB`, `VIA`, `FLX` or `SBB` (184 distinct values in 2025). |
+| `is_additional_stop` | boolean | Stop not in the original plan. |
+| `is_replacement_train` | boolean | Service runs as a replacement for another train. |
+| `replaced_train_type`, `replaced_train_number` | string | The replaced train, for replacement services. |
+| `has_plan_record` | boolean | Whether the stop has a timetable plan record. |
 | `train_line_ride_id` | string | Identifier for a train ride. |
 | `train_line_station_num` | integer | Stop order in the train's route. |
 | `arrival_planned_time` | timestamp (ns) | Planned arrival time, if present. |
@@ -40,6 +48,9 @@ Supported alternate path: `data/raw/monthly_processed_data/data-YYYY-MM.parquet`
 | `departure_planned_time` | timestamp (ns) | Planned departure time, if present. |
 | `departure_change_time` | timestamp (ns) | Changed departure time, if present. |
 | `id` | string | Source stop identifier. Unique per stop event. |
+
+`train_number`, `train_type` and `delay_in_min` are null together in 138,471
+rows, none of which has a plan record.
 
 ## Clean Table: `stops_clean`
 
@@ -52,10 +63,13 @@ non-null `id` and `time`. Blank strings are normalized to NULL.
 | `station_name` | string | Trimmed station name; NULL if blank in the source. |
 | `xml_station_name` | string | Trimmed XML station name. |
 | `eva` | string | EVA station number. |
-| `train_name` | string | Trimmed train display name. |
+| `train_name` | string | `train_type` plus `line_number`, falling back to `train_number` (`HLB RB21`, `ICE 823`). NULL if `train_type` is NULL. Because lines are preferred, `line_metrics` groups services by line where one exists, not by individual train. |
+| `train_number`, `line_number` | string | Trimmed source values. |
 | `final_destination_station` | string | Trimmed final destination. |
 | `delay_min` | integer | Cleaned delay minutes; values below -60 or above 720 are set to NULL. |
-| `is_canceled` | boolean | Cancellation flag; null source values become `false`. |
+| `is_canceled` | boolean | True if `arrival_is_canceled` or `departure_is_canceled` is true. This counts partial cancellations (a train that arrives but does not depart, or the reverse) as canceled. |
+| `arrival_is_canceled`, `departure_is_canceled` | boolean | Source flags, kept for narrower cancellation definitions. |
+| `is_additional_stop`, `is_replacement_train`, `replaced_train_type`, `replaced_train_number`, `has_plan_record` | mixed | Passed through from the source. |
 | `train_type` | string | Upper-cased service family. |
 | `train_line_ride_id` | string | Train ride identifier. |
 | `train_line_station_num` | integer | Stop order in the route. |

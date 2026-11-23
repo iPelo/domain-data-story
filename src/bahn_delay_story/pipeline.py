@@ -49,8 +49,8 @@ def run_pipeline(
     files = source_parquet_files()
     if not files:
         raise FileNotFoundError(
-            "No source Parquet files found in data/raw/yearly_processed_data or "
-            "data/raw/monthly_processed_data. Run `uv run bahn-download` first."
+            "No source Parquet files found in data/raw/monthly_processed_data. "
+            "Run `uv run bahn-download` first."
         )
     if sample_limit is not None:
         sample_limit = int(sample_limit)

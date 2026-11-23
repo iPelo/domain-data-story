@@ -10,7 +10,7 @@ from huggingface_hub import snapshot_download
 from bahn_delay_story.config import RAW_DIR
 
 DATASET_ID = "piebro/deutsche-bahn-data"
-DEFAULT_ALLOW_PATTERN = "yearly_processed_data/data-*.parquet"
+DEFAULT_ALLOW_PATTERN = "monthly_processed_data/data-*.parquet"
 
 
 def download_monthly_processed(
@@ -33,7 +33,7 @@ def main() -> None:
     parser.add_argument(
         "--allow-pattern",
         default=DEFAULT_ALLOW_PATTERN,
-        help='Hugging Face allow pattern, e.g. "yearly_processed_data/data-2025-*.parquet".',
+        help='Hugging Face allow pattern, e.g. "monthly_processed_data/data-2025-*.parquet".',
     )
     parser.add_argument(
         "--local-dir",

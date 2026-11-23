@@ -32,7 +32,7 @@ Install [uv](https://docs.astral.sh/uv/), then run from the repository folder:
 
 ```bash
 uv sync
-uv run bahn-download --allow-pattern "yearly_processed_data/data-2025-*.parquet"
+uv run bahn-download --allow-pattern "monthly_processed_data/data-2025-*.parquet"
 uv run bahn-pipeline
 uv run bahn-figures
 uv run streamlit run app.py
