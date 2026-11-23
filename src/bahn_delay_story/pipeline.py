@@ -26,6 +26,7 @@ OUTPUT_TABLES = [
     "train_type_day_metrics",
     "hourly_delay_metrics",
     "line_metrics",
+    "stable_line_metrics",
 ]
 
 

@@ -16,6 +16,10 @@ FEATURE_TABLES = (
     "line_metrics",
 )
 
+# Validated like FEATURE_TABLES but may be empty, e.g. for a sample run that
+# does not span the January-October stable panel.
+OPTIONAL_FEATURE_TABLES = ("stable_line_metrics",)
+
 # Cleaning bounds applied in clean_stops.sql.
 DELAY_MIN_FLOOR = -60
 DELAY_MIN_CEIL = 720
@@ -83,6 +87,7 @@ def check_clean(con: duckdb.DuckDBPyConnection) -> dict[str, object]:
           MIN(service_date),
           MAX(service_date),
           COUNT(*) FILTER (WHERE is_late_6_min IS NULL),
+          COUNT(*) FILTER (WHERE in_stable_panel),
           COUNT(*) FILTER (
             WHERE (is_late_6_min IS NULL) <> (is_late_15_min IS NULL)
                OR (is_late_6_min IS NULL) <> (is_late_60_min IS NULL)
@@ -107,7 +112,8 @@ def check_clean(con: duckdb.DuckDBPyConnection) -> dict[str, object]:
         "min_service_date": str(row[10]),
         "max_service_date": str(row[11]),
         "unknown_late_flags": int(row[12]),
-        "inconsistent_late_flags": int(row[13]),
+        "stable_panel_rows": int(row[13]),
+        "inconsistent_late_flags": int(row[14]),
     }
 
     _require(metrics["rows_clean"] > 0, "stops_clean is empty.")
@@ -142,7 +148,7 @@ def check_features(con: duckdb.DuckDBPyConnection) -> dict[str, dict[str, int]]:
     """Assert each feature table is non-empty with valid shares and counts."""
     metrics: dict[str, dict[str, int]] = {}
 
-    for table in FEATURE_TABLES:
+    for table in FEATURE_TABLES + OPTIONAL_FEATURE_TABLES:
         rows, bad_shares, canceled_over, bad_stop_count, bad_late_counts = con.execute(
             f"""
             SELECT
@@ -169,7 +175,8 @@ def check_features(con: duckdb.DuckDBPyConnection) -> dict[str, dict[str, int]]:
             "nonpositive_stop_count": int(bad_stop_count),
             "late_counts_out_of_range": int(bad_late_counts),
         }
-        _require(table_metrics["rows"] > 0, f"{table} is empty.")
+        if table in FEATURE_TABLES:
+            _require(table_metrics["rows"] > 0, f"{table} is empty.")
         _require(
             table_metrics["shares_out_of_range"] == 0,
             f"{table} has share columns outside [0, 1].",
@@ -189,14 +196,14 @@ def check_features(con: duckdb.DuckDBPyConnection) -> dict[str, dict[str, int]]:
         )
         metrics[table] = table_metrics
 
-    below_floor = con.execute(
-        f"SELECT COUNT(*) FROM line_metrics WHERE stop_count < {LINE_METRICS_MIN_STOPS}"
-    ).fetchone()[0]
-    _require(
-        int(below_floor) == 0,
-        f"line_metrics has rows below the HAVING floor of "
-        f"{LINE_METRICS_MIN_STOPS} stops.",
-    )
+    for table in ("line_metrics", "stable_line_metrics"):
+        below_floor = con.execute(
+            f"SELECT COUNT(*) FROM {table} WHERE stop_count < {LINE_METRICS_MIN_STOPS}"
+        ).fetchone()[0]
+        _require(
+            int(below_floor) == 0,
+            f"{table} has rows below the HAVING floor of {LINE_METRICS_MIN_STOPS} stops.",
+        )
     return metrics
 
 
@@ -214,7 +221,8 @@ def format_report(report: dict[str, object]) -> str:
         f"dates {clean['min_service_date']}..{clean['max_service_date']} "
         f"null_delay={clean['null_delay_min']:,} "
         f"null_station={clean['null_station_names']:,} "
-        f"unknown_late_flag={clean['unknown_late_flags']:,}",
+        f"unknown_late_flag={clean['unknown_late_flags']:,} "
+        f"stable_panel={clean['stable_panel_rows']:,}",
     ]
     for table, table_metrics in features.items():
         lines.append(f"[quality] feature  {table} rows={table_metrics['rows']:,}")

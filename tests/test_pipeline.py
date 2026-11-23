@@ -165,3 +165,61 @@ def test_pipeline_with_generated_data(tmp_path: Path, monkeypatch) -> None:
 
     assert verify_database(database) == report
     assert run_pipeline(database=database, output_dir=output_dir) == report
+
+
+def test_stable_panel_flag(tmp_path: Path, monkeypatch) -> None:
+    """Only stations seen in every month Jan-Oct 2025, dated Jan-Oct, are in the panel."""
+    source = tmp_path / "data-2025.parquet"
+    with duckdb.connect() as con:
+        con.execute(
+            """
+            CREATE TABLE sample AS
+            -- Hub: 120 stops in each month January-November.
+            SELECT 'hub-' || m || '-' || i AS id, 'Hub' AS station_name, m, 5 AS delay_in_min
+            FROM range(1, 12) AS months(m), range(120) AS rows(i)
+            UNION ALL
+            -- Gap: present January-September only, so never in the panel.
+            SELECT 'gap-' || m || '-' || i, 'Gap', m, 5
+            FROM range(1, 10) AS months(m), range(20) AS rows(i)
+            """
+        )
+        con.execute(
+            f"""
+            COPY (
+              SELECT
+                id,
+                station_name,
+                station_name AS xml_station_name,
+                '1' AS eva,
+                'ICE 1' AS train_name,
+                'End' AS final_destination_station,
+                delay_in_min,
+                false AS is_canceled,
+                'ICE' AS train_type,
+                'ride-1' AS train_line_ride_id,
+                1 AS train_line_station_num,
+                make_timestamp(2025, m, 15, 8, 0, 0) AS time,
+                NULL::TIMESTAMP AS arrival_planned_time,
+                NULL::TIMESTAMP AS arrival_change_time,
+                NULL::TIMESTAMP AS departure_planned_time,
+                NULL::TIMESTAMP AS departure_change_time
+              FROM sample
+            ) TO {duckdb_string_literal(str(source))} (FORMAT PARQUET)
+            """
+        )
+
+    monkeypatch.setattr("bahn_delay_story.pipeline.source_parquet_files", lambda: [source])
+    database = tmp_path / "panel.duckdb"
+    report = run_pipeline(database=database, output_dir=tmp_path / "processed")
+
+    assert report["clean"]["stable_panel_rows"] == 10 * 120
+    with duckdb.connect(database, read_only=True) as con:
+        assert con.execute(
+            "SELECT station_name, service_month FROM stops_clean "
+            "WHERE in_stable_panel GROUP BY ALL ORDER BY ALL"
+        ).fetchall() == [("Hub", month) for month in range(1, 11)]
+        assert con.execute(
+            "SELECT SUM(stop_count) FROM train_type_day_metrics WHERE in_stable_panel"
+        ).fetchone() == (1200,)
+        assert con.execute("SELECT stop_count FROM line_metrics").fetchall() == [(1500,)]
+        assert con.execute("SELECT stop_count FROM stable_line_metrics").fetchall() == [(1200,)]

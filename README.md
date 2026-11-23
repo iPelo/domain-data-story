@@ -36,8 +36,8 @@ Run `uv run jupyter lab` to open the notebooks in order: `01_eda`,
 `reports/figures/`. Raw data, processed tables, and charts stay local.
 
 Station coverage expands in November 2025, so the analysis notebook uses the
-stable January–October panel for trend comparisons. The dashboard shows all
-processed data. See [data notes](DATA.md) for metrics, limitations, and attribution.
+stable January–October panel for trend comparisons. The dashboard shows the same
+stable panel by default, with a toggle for all processed data. See [data notes](DATA.md) for metrics, limitations, and attribution.
 
 For development checks: `uv sync --extra dev`, then `uv run pytest` and
 `uv run ruff check .`.

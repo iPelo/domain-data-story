@@ -7,10 +7,22 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 
+def pooled_late_share(df: pd.DataFrame, keys: list[str]) -> pd.DataFrame:
+    """Sum late and eligible stops per key group and divide.
+
+    Feature tables can hold several rows per key (for example one per
+    in_stable_panel value), so shares must be pooled from counts.
+    """
+    pooled = df.groupby(keys, as_index=False)[["late_count_6_min", "late_eligible_count"]].sum()
+    eligible = pooled["late_eligible_count"].where(pooled["late_eligible_count"] > 0)
+    pooled["late_share_6_min"] = pooled["late_count_6_min"] / eligible
+    return pooled
+
+
 def train_type_late_share(df: pd.DataFrame) -> go.Figure:
-    """Line chart of late share by train type over time."""
+    """Line chart of pooled daily late share by train type."""
     fig = px.line(
-        df,
+        pooled_late_share(df, ["service_date", "train_type"]),
         x="service_date",
         y="late_share_6_min",
         color="train_type",
@@ -35,11 +47,7 @@ def weekday_hour_late_share(df: pd.DataFrame) -> pd.DataFrame:
     stops with a known late flag, rather than an unweighted mean of group rates.
     Weekday codes '0'..'6' (Sunday first) become Sun..Sat row labels.
     """
-    cells = df.groupby(["weekday", "hour_of_day"], as_index=False)[
-        ["late_count_6_min", "late_eligible_count"]
-    ].sum()
-    eligible = cells["late_eligible_count"].where(cells["late_eligible_count"] > 0)
-    cells["late_share_6_min"] = cells["late_count_6_min"] / eligible
+    cells = pooled_late_share(df, ["weekday", "hour_of_day"])
     grid = cells.pivot(index="weekday", columns="hour_of_day", values="late_share_6_min")
     grid = grid.reindex(index=[str(day) for day in range(7)], columns=range(24))
     grid.index = WEEKDAY_LABELS

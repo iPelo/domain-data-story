@@ -12,8 +12,9 @@
 
 The notebooks study 2025. Trend comparisons use stations present in every
 month from January through October, before station coverage expands in November.
-The dashboard shows all processed data, so it should not be used alone to draw
-stable-panel trend conclusions.
+The pipeline marks these stops with `in_stable_panel`. The dashboard shows the
+stable panel by default; its **Show all data** toggle includes every processed
+stop, which mixes in the coverage break.
 
 ## Source: Monthly Processed Parquet
 
@@ -71,6 +72,7 @@ non-null `id` and `time`. Blank strings are normalized to NULL.
 | `is_late_6_min` | boolean | True if not canceled and `delay_min` is at least 6. False if canceled. NULL if not canceled and `delay_min` is NULL (missing or out of range). |
 | `is_late_15_min` | boolean | Same rule at 15 minutes. |
 | `is_late_60_min` | boolean | Same rule at 60 minutes. |
+| `in_stable_panel` | boolean | True if the station has stops in every month January–October 2025 and the stop is dated January–October 2025. |
 
 ## Feature Tables
 
@@ -82,6 +84,11 @@ Created by `src/bahn_delay_story/delay_metrics.sql`.
 | `train_type_day_metrics` | date, train type | National train-family trend lines. |
 | `hourly_delay_metrics` | date, weekday, hour, train type | Weekday/hour heatmaps. |
 | `line_metrics` | train type, train name, destination | Route/service outlier ranking. |
+| `stable_line_metrics` | train type, train name, destination | `line_metrics` over stable-panel stops only. May be empty for sample runs. |
+
+`station_day_metrics`, `train_type_day_metrics` and `hourly_delay_metrics` also
+group by `in_stable_panel`. Filter on it, or sum counts across it; distinct counts
+(`station_count`, `ride_count`) cannot be summed across it.
 
 Shared metric columns:
 
@@ -99,7 +106,7 @@ Shared metric columns:
 | `late_count_6_min`, `late_count_15_min`, `late_count_60_min` | Stops flagged late at each threshold (`late_count_60_min` only where `late_share_60_min` exists). When pooling rows, sum counts and divide by summed `late_eligible_count`; do not average share columns. |
 | `station_count`, `ride_count` | Distinct stations / rides in the group (`train_type_day_metrics`, `line_metrics`). |
 
-`line_metrics` keeps only groups with `stop_count >= 100`.
+`line_metrics` and `stable_line_metrics` keep only groups with `stop_count >= 100`.
 
 ## Known Gotchas
 
