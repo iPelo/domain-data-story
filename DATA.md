@@ -63,7 +63,7 @@ non-null `id` and `time`. Blank strings are normalized to NULL.
 | `station_name` | string | Trimmed station name; NULL if blank in the source. |
 | `xml_station_name` | string | Trimmed XML station name. |
 | `eva` | string | EVA station number. |
-| `train_name` | string | `train_type` plus `line_number`, falling back to `train_number` (`HLB RB21`, `ICE 823`). NULL if `train_type` is NULL. Because lines are preferred, `line_metrics` groups services by line where one exists, not by individual train. |
+| `train_name` | string | `train_type` plus `line_number`, falling back to `train_number` (`HLB RB21`, `ICE 823`). A line that already names the type is used alone (`S4`, `RE 16`, not `S S4`). NULL if `train_type` is NULL. Because lines are preferred, `line_metrics` groups services by line where one exists, not by individual train. |
 | `train_number`, `line_number` | string | Trimmed source values. |
 | `final_destination_station` | string | Trimmed final destination. |
 | `delay_min` | integer | Cleaned delay minutes; values below -60 or above 720 are set to NULL. |

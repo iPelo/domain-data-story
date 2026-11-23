@@ -6,8 +6,11 @@
 --                      The source no longer has train_name or is_canceled:
 --                      train_name is rebuilt as train_type plus line_number,
 --                      falling back to train_number: 'HLB RB21' for a line,
---                      'ICE 823' for a train with no line. Rows with no
---                      train_type, or neither line nor number, get NULL.
+--                      'ICE 823' for a train with no line. A line that already
+--                      names the type ('S4' or 'RE 16' for S/RE, or a line equal
+--                      to the type) is used alone, so names read 'S4', not
+--                      'S S4'. Rows with no train_type, or neither line nor
+--                      number, get NULL.
 --   * Cancellation   - the source flags arrival and departure separately. A stop
 --                      counts as cancelled if either is cancelled. This includes
 --                      partial cancellations where the train still arrives but
@@ -33,17 +36,33 @@
 -- Idempotent: CREATE OR REPLACE rebuilds the table from scratch each run.
 
 CREATE OR REPLACE TABLE stops_clean AS
-WITH cleaned AS (
+WITH source AS (
+  SELECT
+    *,
+    UPPER(NULLIF(TRIM(train_type), '')) AS type_code,
+    NULLIF(TRIM(line_number), '') AS line_code
+  FROM monthly_raw
+),
+cleaned AS (
   SELECT
     CAST(id AS VARCHAR) AS stop_id,
     NULLIF(TRIM(station_name), '') AS station_name,
     NULLIF(TRIM(xml_station_name), '') AS xml_station_name,
     CAST(eva AS VARCHAR) AS eva,
-    UPPER(NULLIF(TRIM(train_type), '')) || ' '
-      || COALESCE(NULLIF(TRIM(line_number), ''), NULLIF(TRIM(train_number), ''))
-      AS train_name,
+    CASE
+      -- The line already carries the type: 'S4', 'RE 16', 'SEV RE1', or just
+      -- 'SAB'. Requiring a digit or space after the type keeps S + 'SEV' as
+      -- 'S SEV'.
+      WHEN UPPER(line_code) = type_code
+        OR (
+          starts_with(UPPER(line_code), type_code)
+          AND regexp_matches(substr(UPPER(line_code), length(type_code) + 1), '^[[:space:]0-9]')
+        )
+        THEN line_code
+      ELSE type_code || ' ' || COALESCE(line_code, NULLIF(TRIM(train_number), ''))
+    END AS train_name,
     NULLIF(TRIM(train_number), '') AS train_number,
-    NULLIF(TRIM(line_number), '') AS line_number,
+    line_code AS line_number,
     NULLIF(TRIM(final_destination_station), '') AS final_destination_station,
     CASE
       WHEN delay_in_min < -60 OR delay_in_min > 720 THEN NULL
@@ -98,7 +117,7 @@ WITH cleaned AS (
       WHEN delay_min IS NULL THEN NULL
       ELSE delay_min >= 60
     END AS is_late_60_min
-  FROM monthly_raw
+  FROM source
   WHERE id IS NOT NULL
     AND time IS NOT NULL
 ),

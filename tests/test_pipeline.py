@@ -180,30 +180,65 @@ def test_pipeline_with_generated_data(tmp_path: Path, monkeypatch) -> None:
     assert run_pipeline(database=database, output_dir=output_dir) == report
 
 
-@pytest.mark.parametrize(
-    ("train_type", "expected"),
-    [("ICE", True), ("flx", True), ("EST", True), ("RE", False), ("SBB", False), (None, False)],
-)
-def test_long_distance_flag(tmp_path: Path, train_type: str | None, expected: bool) -> None:
+def _clean_one_stop(
+    train_type: str | None, line_number: str | None = None, train_number: str | None = "1"
+) -> tuple:
+    """Run clean_stops.sql on a single source row; return (train_name, is_long_distance)."""
+
+    def literal(value: str | None) -> str:
+        return "NULL" if value is None else duckdb_string_literal(value)
+
     with duckdb.connect() as con:
         con.execute(
-            """
+            f"""
             CREATE VIEW monthly_raw AS
             SELECT
               '1' AS id, 'A' AS station_name, 'A' AS xml_station_name, '1' AS eva,
-              '1' AS train_number, NULL::VARCHAR AS line_number, 'B' AS final_destination_station,
+              {literal(train_number)}::VARCHAR AS train_number,
+              {literal(line_number)}::VARCHAR AS line_number,
+              'B' AS final_destination_station,
               0 AS delay_in_min, false AS arrival_is_canceled, false AS departure_is_canceled,
-              $train_type::VARCHAR AS train_type, false AS is_additional_stop,
+              {literal(train_type)}::VARCHAR AS train_type, false AS is_additional_stop,
               false AS is_replacement_train, NULL::VARCHAR AS replaced_train_type,
               NULL::VARCHAR AS replaced_train_number, true AS has_plan_record,
               'r' AS train_line_ride_id, 1 AS train_line_station_num,
               TIMESTAMP '2025-01-01 08:00' AS time,
               NULL::TIMESTAMP AS arrival_planned_time, NULL::TIMESTAMP AS arrival_change_time,
               NULL::TIMESTAMP AS departure_planned_time, NULL::TIMESTAMP AS departure_change_time
-            """.replace("$train_type", "NULL" if train_type is None else f"'{train_type}'")
+            """
         )
         con.execute((SQL_DIR / "clean_stops.sql").read_text())
-        assert con.execute("SELECT is_long_distance FROM stops_clean").fetchone() == (expected,)
+        return con.execute("SELECT train_name, is_long_distance FROM stops_clean").fetchone()
+
+
+@pytest.mark.parametrize(
+    ("train_type", "expected"),
+    [("ICE", True), ("flx", True), ("EST", True), ("RE", False), ("SBB", False), (None, False)],
+)
+def test_long_distance_flag(train_type: str | None, expected: bool) -> None:
+    assert _clean_one_stop(train_type)[1] is expected
+
+
+@pytest.mark.parametrize(
+    ("train_type", "line_number", "train_number", "expected"),
+    [
+        ("S", "S4", "1", "S4"),  # line repeats the type: no "S S4"
+        ("re", "RE 16", "1", "RE 16"),
+        ("SAB", "SAB", "1", "SAB"),  # line is just the type
+        ("HLB", "RB21", "1", "HLB RB21"),  # operator code plus line
+        ("SEV", "SEV RE1", "1", "SEV RE1"),
+        ("S", "SEV", "1", "S SEV"),  # type prefix without a digit or space is kept
+        ("R", "RS4", "1", "R RS4"),
+        ("ICE", "26", "1", "ICE 26"),
+        ("ICE", None, "823", "ICE 823"),  # no line: fall back to train number
+        (None, "S4", "1", None),
+        ("S", None, None, None),
+    ],
+)
+def test_train_name(
+    train_type: str | None, line_number: str | None, train_number: str | None, expected: str | None
+) -> None:
+    assert _clean_one_stop(train_type, line_number, train_number)[0] == expected
 
 
 def test_stable_panel_flag(tmp_path: Path, monkeypatch) -> None:
