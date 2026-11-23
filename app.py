@@ -92,14 +92,14 @@ left, right = st.columns([1.25, 1])
 
 with left:
     st.subheader("Late Share By Train Type")
-    st.plotly_chart(train_type_late_share(train_type_day), use_container_width=True)
+    st.plotly_chart(train_type_late_share(train_type_day), width="stretch")
 
 with right:
     st.subheader("Weekday/Hour Delay Pattern")
     if hourly.empty:
         st.warning("No hourly metrics available for the selected filters.")
     else:
-        st.plotly_chart(hourly_heatmap(hourly), use_container_width=True)
+        st.plotly_chart(hourly_heatmap(hourly), width="stretch")
 
 st.subheader("Highest Late-Share Services")
 if line_metrics.empty:
@@ -132,6 +132,6 @@ else:
             "avg_delay_min": st.column_config.NumberColumn(format="%.1f"),
             "p90_delay_min": st.column_config.NumberColumn(format="%.1f"),
         },
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
